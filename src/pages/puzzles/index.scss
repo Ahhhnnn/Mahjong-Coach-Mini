@@ -1,0 +1,202 @@
+.puzzles-page {
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.page-header {
+  background: #fff;
+  padding: 32px 28px 24px;
+  border-bottom: 1px solid #f0f0f0;
+
+  .header-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+
+    .header-title {
+      font-size: 38px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+
+    .header-count {
+      font-size: 24px;
+      color: #1a5c2e;
+      background: #e8f5e9;
+      padding: 6px 16px;
+      border-radius: 8px;
+    }
+  }
+
+  .header-desc {
+    font-size: 24px;
+    color: #999;
+    margin-top: 10px;
+    display: block;
+  }
+}
+
+.chapter-list {
+  padding: 20px 28px;
+}
+
+.chapter-card {
+  background: #f9fbfc;
+  border-radius: 16px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+
+  &.locked {
+    opacity: 0.6;
+  }
+
+  .chapter-header {
+    display: flex;
+    align-items: center;
+    padding: 24px;
+
+    .chapter-index {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #1a5c2e, #2d8a4e);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 20px;
+      flex-shrink: 0;
+
+      .chapter-index-text {
+        font-size: 28px;
+        font-weight: 700;
+        color: #fff;
+      }
+    }
+
+    .chapter-info {
+      flex: 1;
+
+      .chapter-title-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+
+        .chapter-title {
+          font-size: 28px;
+          font-weight: 600;
+          color: #333;
+        }
+
+        .lock-icon {
+          font-size: 22px;
+        }
+      }
+
+      .chapter-desc {
+        font-size: 22px;
+        color: #999;
+        margin-top: 6px;
+        display: block;
+      }
+
+      .chapter-progress {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 12px;
+
+        .chapter-bar {
+          flex: 1;
+          height: 8px;
+          background: #e8e8e8;
+          border-radius: 4px;
+          overflow: hidden;
+
+          .chapter-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #1a5c2e, #4caf50);
+            border-radius: 4px;
+            transition: width 0.3s;
+          }
+        }
+
+        .chapter-progress-text {
+          font-size: 22px;
+          color: #666;
+          flex-shrink: 0;
+        }
+      }
+    }
+
+    .chapter-arrow {
+      font-size: 36px;
+      color: #ccc;
+      margin-left: 12px;
+      transform: rotate(90deg);
+      transition: transform 0.2s;
+
+      &.expanded {
+        transform: rotate(-90deg);
+      }
+    }
+  }
+
+  .puzzle-items {
+    border-top: 1px solid #f0f0f0;
+    padding: 8px 24px;
+
+    .puzzle-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 0;
+      border-bottom: 1px solid #f5f5f5;
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      .puzzle-left {
+        .puzzle-name {
+          font-size: 26px;
+          color: #333;
+          display: block;
+        }
+
+        .puzzle-difficulty {
+          font-size: 20px;
+          color: #f5a623;
+          margin-top: 4px;
+          display: block;
+        }
+      }
+
+      .puzzle-status {
+        font-size: 22px;
+        padding: 6px 16px;
+        border-radius: 8px;
+
+        &.excellent {
+          color: #1a5c2e;
+          background: #e8f5e9;
+        }
+
+        &.good {
+          color: #f5a623;
+          background: #fef9e7;
+        }
+
+        &.poor {
+          color: #e74c3c;
+          background: #fdedec;
+        }
+
+        &.none {
+          color: #999;
+          background: #f5f5f5;
+        }
+      }
+    }
+  }
+}

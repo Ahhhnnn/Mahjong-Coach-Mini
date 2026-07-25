@@ -1,0 +1,201 @@
+.guess-page {
+  min-height: 100vh;
+  background: #f5f7fa;
+  padding-bottom: 40px;
+}
+
+.guess-header {
+  background: #fff;
+  padding: 32px 28px;
+  border-bottom: 1px solid #f0f0f0;
+
+  .guess-title {
+    font-size: 36px;
+    font-weight: 700;
+    color: #1a1a1a;
+    display: block;
+  }
+
+  .guess-sub {
+    font-size: 24px;
+    color: #999;
+    margin-top: 8px;
+    display: block;
+  }
+}
+
+.card {
+  margin: 20px 28px;
+  background: #f9fbfc;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.question-card {
+  .question-text {
+    font-size: 28px;
+    color: #333;
+    line-height: 44px;
+  }
+}
+
+.options-card {
+  .options-title {
+    font-size: 26px;
+    font-weight: 600;
+    color: #333;
+    display: block;
+    margin-bottom: 20px;
+  }
+
+  .options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+
+    .option-item {
+      height: 88px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      background: #fff;
+      transition: all 0.15s;
+
+      &.selected {
+        border-color: #1a5c2e;
+        background: #e8f5e9;
+
+        .option-text {
+          color: #1a5c2e;
+          font-weight: 600;
+        }
+      }
+
+      .option-text {
+        font-size: 28px;
+        color: #555;
+      }
+    }
+  }
+
+  .btn-submit {
+    height: 92px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 46px;
+    background: #ccc;
+
+    &.active {
+      background: #1a5c2e;
+      box-shadow: 0 4px 16px rgba(26, 92, 46, 0.25);
+    }
+
+    .btn-submit-text {
+      font-size: 30px;
+      font-weight: 600;
+      color: #fff;
+    }
+  }
+}
+
+.result-card {
+  .result-banner {
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 24px;
+
+    &.correct {
+      background: #e8f5e9;
+      .result-banner-text { color: #1a5c2e; }
+    }
+
+    &.wrong {
+      background: #fdedec;
+      .result-banner-text { color: #e74c3c; }
+    }
+
+    .result-banner-text {
+      font-size: 30px;
+      font-weight: 700;
+    }
+  }
+
+  .analysis-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1a1a1a;
+    display: block;
+    margin-bottom: 12px;
+  }
+
+  .analysis-text {
+    font-size: 26px;
+    color: #444;
+    line-height: 42px;
+    display: block;
+    margin-bottom: 20px;
+  }
+
+  .clues-box {
+    background: #f0f7f1;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+
+    .clues-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: #1a5c2e;
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    .clue-line {
+      font-size: 24px;
+      color: #555;
+      line-height: 38px;
+      display: block;
+    }
+  }
+
+  .waits-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 24px;
+
+    .waits-label {
+      font-size: 26px;
+      color: #666;
+      margin-right: 12px;
+    }
+
+    .wait-tile {
+      width: 52px;
+      height: 70px;
+      margin-right: 8px;
+      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  .btn-next {
+    height: 92px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1a5c2e;
+    border-radius: 46px;
+
+    .btn-next-text {
+      font-size: 30px;
+      font-weight: 600;
+      color: #fff;
+    }
+  }
+}

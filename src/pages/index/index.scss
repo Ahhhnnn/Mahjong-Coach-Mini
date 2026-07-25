@@ -1,0 +1,219 @@
+.dashboard-page {
+  min-height: 100vh;
+  background: #f5f7fa;
+  padding-bottom: 20px;
+}
+
+.brand-header {
+  background: linear-gradient(135deg, #1a5c2e 0%, #2d8a4e 100%);
+  padding: 36px 28px 48px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  .brand-left {
+    .brand-name {
+      font-size: 36px;
+      font-weight: 700;
+      color: #fff;
+      display: block;
+    }
+
+    .brand-sub {
+      font-size: 24px;
+      color: rgba(255, 255, 255, 0.75);
+      margin-top: 6px;
+      display: block;
+    }
+  }
+
+  .training-status {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 20px;
+    padding: 8px 18px;
+
+    .status-text {
+      font-size: 22px;
+      color: #fff;
+    }
+  }
+}
+
+.card {
+  background: #f9fbfc;
+  border-radius: 16px;
+  margin: -20px 28px 20px;
+  padding: 28px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+
+  & + .card {
+    margin-top: 0;
+  }
+
+  .card-title-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 20px;
+
+    .card-title {
+      font-size: 30px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+
+    .card-subtitle {
+      font-size: 22px;
+      color: #999;
+    }
+  }
+}
+
+.today-card {
+  .today-stats {
+    display: flex;
+    justify-content: space-around;
+
+    .today-stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+
+      .stat-num {
+        font-size: 36px;
+        font-weight: 700;
+        color: #1a5c2e;
+      }
+
+      .stat-label {
+        font-size: 22px;
+        color: #999;
+        margin-top: 6px;
+      }
+    }
+  }
+}
+
+.radar-card {
+  .radar-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    .radar-shape {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      border: 3px solid #c8e6c9;
+      background: radial-gradient(circle, #e8f5e9 0%, #f1f8f2 70%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+
+      .radar-center {
+        font-size: 40px;
+        font-weight: 700;
+        color: #1a5c2e;
+      }
+
+      .radar-center-label {
+        font-size: 20px;
+        color: #999;
+        margin-top: 4px;
+      }
+    }
+
+    .radar-dims {
+      flex: 1;
+      margin-left: 24px;
+
+      .dim-item {
+        display: flex;
+        align-items: center;
+        font-size: 24px;
+        color: #555;
+        margin-bottom: 16px;
+
+        .dim-dot {
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background: #2d8a4e;
+          margin-right: 12px;
+        }
+      }
+    }
+  }
+}
+
+.progress-card {
+  .progress-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+
+    .progress-label {
+      font-size: 26px;
+      color: #555;
+    }
+
+    .progress-count {
+      font-size: 26px;
+      color: #1a5c2e;
+      font-weight: 600;
+    }
+  }
+
+  .progress-bar {
+    height: 12px;
+    background: #e8f5e9;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 24px;
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #1a5c2e, #4caf50);
+      border-radius: 6px;
+    }
+  }
+
+  .progress-actions {
+    display: flex;
+    gap: 20px;
+
+    .btn-start {
+      flex: 1.5;
+      height: 84px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1a5c2e;
+      border-radius: 42px;
+      box-shadow: 0 4px 16px rgba(26, 92, 46, 0.25);
+
+      .btn-start-text {
+        font-size: 28px;
+        font-weight: 600;
+        color: #fff;
+      }
+    }
+
+    .btn-guess {
+      flex: 1;
+      height: 84px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #1a5c2e;
+      border-radius: 42px;
+
+      .btn-guess-text {
+        font-size: 28px;
+        font-weight: 600;
+        color: #1a5c2e;
+      }
+    }
+  }
+}

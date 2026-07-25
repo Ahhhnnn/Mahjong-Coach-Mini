@@ -1,0 +1,17 @@
+{
+  "name": "coachChat",
+  "version": "1.0.0",
+  "description": "AI 教练聊天云函数 — 代理 DeepSeek API 调用",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  },
+  "cloudfunction-config": {
+    "memorySize": 256,
+    "timeout": 60,
+    "vpc": {
+      "vpcId": "",
+      "subnetId": ""
+    }
+  }
+}

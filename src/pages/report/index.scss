@@ -1,0 +1,220 @@
+.report-page {
+  min-height: 100vh;
+  background: #f5f7fa;
+  padding: 20px 28px;
+}
+
+.card {
+  background: #f9fbfc;
+  border-radius: 16px;
+  padding: 28px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+
+  .card-title {
+    font-size: 30px;
+    font-weight: 700;
+    color: #1a1a1a;
+    display: block;
+  }
+
+  .card-subtitle {
+    font-size: 22px;
+    color: #999;
+    margin-top: 6px;
+    display: block;
+  }
+}
+
+.overview-card {
+  .overview-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 24px;
+
+    .overview-item {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+
+      .ov-num {
+        font-size: 38px;
+        font-weight: 700;
+        color: #1a5c2e;
+      }
+
+      .ov-label {
+        font-size: 22px;
+        color: #999;
+        margin-top: 6px;
+      }
+    }
+  }
+}
+
+.trend-card {
+  .chart-area {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    height: 240px;
+    margin-top: 24px;
+    padding-top: 20px;
+
+    .chart-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex: 1;
+
+      .chart-bar-wrap {
+        width: 32px;
+        height: 180px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+
+        .chart-bar {
+          width: 100%;
+          min-height: 6px;
+          background: linear-gradient(180deg, #2d8a4e, #1a5c2e);
+          border-radius: 6px 6px 0 0;
+        }
+      }
+
+      .chart-label {
+        font-size: 18px;
+        color: #999;
+        margin-top: 8px;
+      }
+    }
+  }
+}
+
+.ai-card {
+  .ai-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+
+    .ai-avatar {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: #e8f5e9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 16px;
+
+      .ai-avatar-text {
+        font-size: 36px;
+      }
+    }
+
+    .ai-info {
+      .ai-name {
+        font-size: 28px;
+        font-weight: 600;
+        color: #333;
+        display: block;
+      }
+
+      .ai-status {
+        font-size: 22px;
+        color: #999;
+        margin-top: 4px;
+        display: block;
+      }
+    }
+  }
+
+  .ai-summary {
+    font-size: 26px;
+    color: #444;
+    line-height: 42px;
+    display: block;
+    margin-bottom: 20px;
+  }
+
+  .ai-tips {
+    background: #f0f7f1;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+
+    .tips-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: #1a5c2e;
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    .tip-line {
+      font-size: 24px;
+      color: #555;
+      line-height: 38px;
+      display: block;
+    }
+  }
+
+  .btn-go {
+    height: 84px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1a5c2e;
+    border-radius: 42px;
+
+    .btn-go-text {
+      font-size: 28px;
+      font-weight: 600;
+      color: #fff;
+    }
+  }
+}
+
+.radar-card {
+  .radar-wrap {
+    display: flex;
+    justify-content: center;
+    margin: 16px 0;
+  }
+
+  .radar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px 24px;
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+
+      .legend-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #1a5c2e;
+        margin-right: 8px;
+      }
+
+      .legend-label {
+        font-size: 22px;
+        color: #666;
+      }
+
+      .legend-value {
+        font-size: 22px;
+        font-weight: 600;
+        color: #1a5c2e;
+        margin-left: 6px;
+      }
+    }
+  }
+}
