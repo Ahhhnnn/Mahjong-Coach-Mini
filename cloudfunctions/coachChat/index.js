@@ -2,6 +2,8 @@ const cloud = require('wx-server-sdk')
 const https = require('https')
 const url = require('url')
 
+const { getProvider, listProviders } = require('./providers')
+
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 // ============================================================
@@ -67,6 +69,11 @@ const COACH_PERSONAS = {
 }
 
 const DEFAULT_COACH_ID = 'hehe'
+
+// ============================================================
+// Provider 选择
+// ============================================================
+const DEFAULT_PROVIDER_ID = 'minimax'
 
 // ============================================================
 // 共享规则（与前端 coach-prompt.ts 保持同步）
@@ -178,62 +185,43 @@ function buildContextMessage(puzzle, ctx) {
 }
 
 // ============================================================
-// 调用 DeepSeek API（非流式）
+// 公共 HTTPS POST（OpenAI 兼容 Chat Completions）
 // ============================================================
-function callDeepSeek(apiKey, baseUrl, model, messages, temperature) {
+function sendPost({ baseUrl, headers, body, timeoutMs = 30000 }) {
+  const parsed = url.parse(baseUrl)
+  const path = (parsed.pathname || '') + '/chat/completions'
+
   return new Promise((resolve, reject) => {
-    const parsed = url.parse(baseUrl)
-    const postData = JSON.stringify({
-      model,
-      messages,
-      temperature: temperature ?? 0.6,
-      stream: false,
-      thinking: { type: 'disabled' },
-    })
-
-    const options = {
-      hostname: parsed.hostname,
-      port: parsed.port || 443,
-      path: (parsed.pathname || '') + '/chat/completions',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Length': Buffer.byteLength(postData),
+    const req = https.request(
+      {
+        hostname: parsed.hostname,
+        port: parsed.port || 443,
+        path,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+          ...headers,
+        },
+        timeout: timeoutMs,
       },
-      timeout: 30000,
-    }
-
-    const req = https.request(options, (res) => {
-      let data = ''
-      res.on('data', (chunk) => {
-        data += chunk
-      })
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(data)
-          if (res.statusCode !== 200) {
-            reject(
-              new Error(
-                json?.error?.message ||
-                  json?.message ||
-                  `Chat API failed (${res.statusCode})`
-              )
-            )
+      (res) => {
+        let data = ''
+        res.on('data', (chunk) => {
+          data += chunk
+        })
+        res.on('end', () => {
+          let json = null
+          try {
+            json = JSON.parse(data)
+          } catch (e) {
+            reject(new Error('解析 AI 响应失败'))
             return
           }
-          const content =
-            String(json?.choices?.[0]?.message?.content ?? '').trim()
-          if (!content) {
-            reject(new Error('模型未返回内容'))
-            return
-          }
-          resolve(content)
-        } catch (e) {
-          reject(new Error('解析 AI 响应失败'))
-        }
-      })
-    })
+          resolve({ statusCode: res.statusCode, json })
+        })
+      }
+    )
 
     req.on('timeout', () => {
       req.destroy()
@@ -244,7 +232,7 @@ function callDeepSeek(apiKey, baseUrl, model, messages, temperature) {
       reject(new Error(e.message || 'AI 调用失败'))
     })
 
-    req.write(postData)
+    req.write(body)
     req.end()
   })
 }
@@ -278,14 +266,23 @@ exports.main = async (event, context) => {
     return { ok: false, error: '缺少题目数据' }
   }
 
-  const apiKey = process.env.DEEPSEEK_API_KEY
-  const baseUrl = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'
-  const model = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash'
+  // 解析 provider
+  const providerId = process.env.AI_PROVIDER || DEFAULT_PROVIDER_ID
+  let provider
+  try {
+    provider = getProvider(providerId)
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+
+  const apiKey = process.env[provider.envKeyName]
+  const baseUrl = process.env.AI_BASE_URL || provider.defaultBaseUrl
+  const model = process.env.AI_MODEL || provider.defaultModel
 
   if (!apiKey) {
     return {
       ok: false,
-      error: '未配置 AI 密钥：请在云函数环境变量中设置 DEEPSEEK_API_KEY',
+      error: `未配置 AI 密钥：请在云函数环境变量中设置 ${provider.envKeyName}（当前 provider=${provider.id}）`,
     }
   }
 
@@ -321,15 +318,39 @@ exports.main = async (event, context) => {
   messages.push({ role: 'user', content: content.trim() })
 
   try {
-    const reply = await callDeepSeek(
+    const req = provider.buildRequest({
       apiKey,
       baseUrl,
       model,
       messages,
-      persona.temperature
-    )
-    return { ok: true, content: reply }
+      temperature: persona.temperature,
+      maxCompletionTokens: 1024,
+    })
+
+    const { statusCode, json } = await sendPost({
+      baseUrl,
+      headers: req.headers,
+      body: req.body,
+    })
+
+    if (statusCode !== 200) {
+      throw new Error(
+        json?.error?.message ||
+          json?.message ||
+          `Chat API failed (${statusCode})`
+      )
+    }
+
+    const reply = provider.parseResponse(json)
+    if (!reply) {
+      throw new Error('模型未返回内容')
+    }
+
+    return { ok: true, content: reply, provider: provider.id, model }
   } catch (e) {
     return { ok: false, error: e.message || 'AI 对话失败' }
   }
 }
+
+// 暴露 provider 列表便于本地/调试
+exports.__listProviders = () => listProviders()

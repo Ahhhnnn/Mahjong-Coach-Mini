@@ -1,7 +1,7 @@
 {
   "name": "coachChat",
   "version": "1.0.0",
-  "description": "AI 教练聊天云函数 — 代理 DeepSeek API 调用",
+  "description": "AI 教练聊天云函数 — 代理多模型调用（默认 MiniMax-M3，可切换 DeepSeek 等）",
   "main": "index.js",
   "dependencies": {
     "wx-server-sdk": "~2.6.3"

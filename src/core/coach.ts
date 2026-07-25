@@ -24,7 +24,7 @@ export type CoachCallResult = {
 
 /**
  * 调用云函数 coachChat 获取 AI 教练回复
- * 云函数代理 DeepSeek API，密钥安全在服务端
+ * 云函数代理多模型调用（默认 MiniMax-M3，可通过 AI_PROVIDER 切换 DeepSeek 等），密钥安全在服务端
  */
 export async function callCoach(input: CoachCallInput): Promise<CoachCallResult> {
   const fixedMelds = input.puzzle.melds?.length ?? 0

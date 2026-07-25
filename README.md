@@ -112,6 +112,48 @@ cd cloudfunctions/saveRecord && pnpm install && tcb fn deploy saveRecord
 
 或使用微信开发者工具的云开发面板直接上传。
 
+## AI 模型切换
+
+`coachChat` 云函数采用 **Provider 适配器** 架构，按环境变量动态选择底层大模型，**前端无任何改动**。
+
+### 支持的模型
+
+| `AI_PROVIDER` | 模型 | 默认 base URL | API Key 环境变量 |
+|---|---|---|---|
+| `minimax`（默认） | `MiniMax-M3` | `https://api.minimaxi.com/v1` | `MINIMAX_API_KEY` |
+| `deepseek` | `deepseek-v4-flash` | `https://api.deepseek.com` | `DEEPSEEK_API_KEY` |
+
+### 切换步骤
+
+1. 打开微信开发者工具 → 云开发 → 云函数 → `coachChat` → 配置 → 环境变量
+2. 新增以下变量（按需）：
+   - `AI_PROVIDER`：填 `minimax` 或 `deepseek`，不填则默认 `minimax`
+   - `<PROVIDER>_API_KEY`：填对应厂商的 API Key（如 `MINIMAX_API_KEY`）
+   - 可选 `AI_BASE_URL`：临时覆盖默认 base URL
+   - 可选 `AI_MODEL`：临时覆盖默认模型名（例如换成 `MiniMax-M2.7-highspeed`）
+3. 重新上传部署 `coachChat` 云函数
+
+### 接入新模型
+
+1. 在 `cloudfunctions/coachChat/providers/` 新建 `<id>.js`，实现统一契约：
+   ```js
+   module.exports = {
+     id: 'openai',
+     name: 'OpenAI',
+     envKeyName: 'OPENAI_API_KEY',
+     defaultBaseUrl: 'https://api.openai.com/v1',
+     defaultModel: 'gpt-4o-mini',
+     buildRequest({ apiKey, baseUrl, model, messages, temperature, maxCompletionTokens }) {
+       return { url: baseUrl, headers: { Authorization: `Bearer ${apiKey}` }, body: JSON.stringify({ ... }) }
+     },
+     parseResponse(json) {
+       return String(json?.choices?.[0]?.message?.content ?? '').trim() || null
+     },
+   }
+   ```
+2. 在 `cloudfunctions/coachChat/providers/index.js` 的 `REGISTRY` 中注册
+3. 云函数环境变量加 `AI_PROVIDER=openai` + `OPENAI_API_KEY=...`
+
 ## 小程序配置
 
 - AppID: `wxd40e10e4f7850325`
