@@ -4,6 +4,7 @@ import Taro, { useDidShow } from '@tarojs/taro'
 
 import type { DiscardPuzzle } from '../../content/types'
 import { getCachedPuzzles, loadPuzzles } from '../../core/puzzle-service'
+import { isLoggedIn, syncCloudRecordsToLocal } from '../../core/auth'
 
 import './index.scss'
 
@@ -20,23 +21,35 @@ export default function DashboardPage() {
 
   useDidShow(() => {
     loadPuzzles().then(setPuzzles)
-    try {
-      const records = Taro.getStorageSync('train_records') || []
-      const today = new Date().toISOString().slice(0, 10)
-      const todayRecords = records.filter(
-        (r: any) => new Date(r.time).toISOString().slice(0, 10) === today
-      )
-      const daySet = new Set(records.map((r: any) => new Date(r.time).toISOString().slice(0, 10)))
-      const reasonable = records.filter((r: any) => r.reasonable).length
-      setStats({
-        todayDone: todayRecords.length,
-        todayGoal: 10,
-        streak: daySet.size,
-        total: records.length,
-        donePuzzles: new Set(records.map((r: any) => r.puzzleId)).size,
-        accuracy: records.length > 0 ? Math.round((reasonable / records.length) * 100) : 0,
+
+    const refreshStats = () => {
+      try {
+        const records = Taro.getStorageSync('train_records') || []
+        const today = new Date().toISOString().slice(0, 10)
+        const todayRecords = records.filter(
+          (r: any) => new Date(r.time).toISOString().slice(0, 10) === today
+        )
+        const daySet = new Set(records.map((r: any) => new Date(r.time).toISOString().slice(0, 10)))
+        const reasonable = records.filter((r: any) => r.reasonable).length
+        setStats({
+          todayDone: todayRecords.length,
+          todayGoal: 10,
+          streak: daySet.size,
+          total: records.length,
+          donePuzzles: new Set(records.map((r: any) => r.puzzleId)).size,
+          accuracy: records.length > 0 ? Math.round((reasonable / records.length) * 100) : 0,
+        })
+      } catch { /* ignore */ }
+    }
+
+    refreshStats()
+
+    // 已登录时后台同步云端记录，同步完成后刷新统计
+    if (isLoggedIn()) {
+      syncCloudRecordsToLocal().then((added) => {
+        if (added > 0) refreshStats()
       })
-    } catch { /* ignore */ }
+    }
   })
 
   const startTraining = () => {

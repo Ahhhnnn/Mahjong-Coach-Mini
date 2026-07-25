@@ -7,6 +7,7 @@ import { ukeire } from '../../core/shanten'
 import { getTileImage } from '../../core/tile-images'
 import { makeRecordId, syncRecordToCloud, type TrainRecord } from '../../core/cloud'
 import { scoreDiscard, type ScoreResult } from '../../core/scoring'
+import { isLoggedIn } from '../../core/auth'
 import type { DiscardPuzzle } from '../../content/types'
 import { getCachedPuzzles, loadPuzzles } from '../../core/puzzle-service'
 import { CoachPanel } from '../../components/coach-panel'
@@ -80,8 +81,18 @@ export default function TrainPage() {
       records.unshift(record)
       Taro.setStorageSync('train_records', records.slice(0, 200))
     } catch { /* ignore */ }
-    // 后台同步到云端（不阻塞 UI，离线/未配置时静默失败）
-    syncRecordToCloud(record)
+
+    if (isLoggedIn()) {
+      // 已登录：后台同步到云端
+      syncRecordToCloud(record)
+    } else {
+      // 未登录：本地已保存，轻提示引导登录
+      Taro.showToast({
+        title: '进度已保存本地，登录后可云端同步',
+        icon: 'none',
+        duration: 2500,
+      })
+    }
   }
 
   const handleSkip = () => {
