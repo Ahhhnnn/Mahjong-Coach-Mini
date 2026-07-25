@@ -2,24 +2,24 @@ import { useState } from 'react'
 import { View, Text } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 
-import puzzlesData from '../../content/puzzles.json'
 import type { DiscardPuzzle } from '../../content/types'
+import { getCachedPuzzles, loadPuzzles } from '../../core/puzzle-service'
 import { CHAPTERS, FREE_CHAPTERS } from '../../content/chapters'
 
 import './index.scss'
 
-const puzzles = puzzlesData as DiscardPuzzle[]
-
-type Record = { puzzleId: string; hit: boolean; reasonable: boolean; time: number }
+type TrainRecordItem = { puzzleId: string; hit: boolean; reasonable: boolean; time: number }
 
 export default function PuzzlesPage() {
+  const [puzzles, setPuzzles] = useState<DiscardPuzzle[]>(getCachedPuzzles())
   const [expandedChapter, setExpandedChapter] = useState<string | null>('ch1')
   const [doneSet, setDoneSet] = useState<Set<string>>(new Set())
   const [bestScores, setBestScores] = useState<Record<string, number>>({})
 
   useDidShow(() => {
+    loadPuzzles().then(setPuzzles)
     try {
-      const records: Record[] = Taro.getStorageSync('train_records') || []
+      const records: TrainRecordItem[] = Taro.getStorageSync('train_records') || []
       const done = new Set(records.map((r) => r.puzzleId))
       setDoneSet(done)
 

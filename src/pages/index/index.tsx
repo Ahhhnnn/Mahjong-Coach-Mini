@@ -2,14 +2,13 @@ import { useState } from 'react'
 import { View, Text } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 
-import puzzlesData from '../../content/puzzles.json'
 import type { DiscardPuzzle } from '../../content/types'
+import { getCachedPuzzles, loadPuzzles } from '../../core/puzzle-service'
 
 import './index.scss'
 
-const puzzles = puzzlesData as DiscardPuzzle[]
-
 export default function DashboardPage() {
+  const [puzzles, setPuzzles] = useState<DiscardPuzzle[]>(getCachedPuzzles())
   const [stats, setStats] = useState({
     todayDone: 0,
     todayGoal: 10,
@@ -20,6 +19,7 @@ export default function DashboardPage() {
   })
 
   useDidShow(() => {
+    loadPuzzles().then(setPuzzles)
     try {
       const records = Taro.getStorageSync('train_records') || []
       const today = new Date().toISOString().slice(0, 10)

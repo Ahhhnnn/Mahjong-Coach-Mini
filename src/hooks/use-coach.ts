@@ -5,7 +5,7 @@ import { callCoach } from '../core/coach'
 import {
   DEFAULT_COACH_ID,
   listCoaches,
-  type PublicCoach,
+  type CoachPersona,
 } from '../content/coach-personas'
 import type { DiscardPuzzle } from '../content/types'
 
@@ -75,13 +75,7 @@ export function useCoach(opts: {
 
   const sendingRef = useRef(false)
   const typewriterTimer = useRef<ReturnType<typeof setInterval> | null>(null)
-  const coaches: PublicCoach[] = listCoaches().map((c) => ({
-    id: c.id,
-    name: c.name,
-    tagline: c.tagline,
-    avatar: c.avatar,
-    accent: c.accent,
-  }))
+  const coaches: CoachPersona[] = listCoaches()
   const activeCoach = coaches.find((c) => c.id === coachId) ?? null
 
   // 切换题目时重置

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text, Image } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
 
@@ -8,18 +8,17 @@ import { getTileImage } from '../../core/tile-images'
 import { makeRecordId, syncRecordToCloud, type TrainRecord } from '../../core/cloud'
 import { scoreDiscard, type ScoreResult } from '../../core/scoring'
 import type { DiscardPuzzle } from '../../content/types'
-import puzzlesData from '../../content/puzzles.json'
+import { getCachedPuzzles, loadPuzzles } from '../../core/puzzle-service'
 import { CoachPanel } from '../../components/coach-panel'
 
 import './index.scss'
-
-const puzzles = puzzlesData as DiscardPuzzle[]
 
 type Phase = 'select' | 'result'
 
 export default function TrainPage() {
   const router = useRouter()
   const initIndex = Number(router.params.index || 0)
+  const [puzzles, setPuzzles] = useState<DiscardPuzzle[]>(getCachedPuzzles())
   const [currentIndex, setCurrentIndex] = useState(initIndex)
   const [selectedTile, setSelectedTile] = useState<Tile | null>(null)
   const [phase, setPhase] = useState<Phase>('select')
@@ -28,7 +27,20 @@ export default function TrainPage() {
   const [result, setResult] = useState<ScoreResult | null>(null)
   const [showCoach, setShowCoach] = useState(false)
 
+  useEffect(() => {
+    loadPuzzles().then(setPuzzles)
+  }, [])
+
   const puzzle = puzzles[currentIndex]
+
+  // 题目尚未加载时显示加载状态
+  if (!puzzle) {
+    return (
+      <View className="train-page">
+        <View className="info-card"><Text className="hand-title">加载中...</Text></View>
+      </View>
+    )
+  }
   const sortedHand = sortTiles(puzzle.hand)
   const fixedMelds = puzzle.melds?.length ?? 0
 
