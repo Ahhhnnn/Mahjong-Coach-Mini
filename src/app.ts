@@ -3,11 +3,6 @@ import { PropsWithChildren } from 'react'
 import { initCloud } from './core/cloud'
 import { ensureLogin } from './core/auth'
 
-import '@taroify/icons/index.scss'
-import '@taroify/core/button/style'
-import '@taroify/core/cell/style'
-import '@taroify/core/grid/style'
-import '@taroify/core/badge/style'
 import './app.scss'
 
 function App({ children }: PropsWithChildren) {

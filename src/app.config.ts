@@ -2,12 +2,26 @@ export default defineAppConfig({
   pages: [
     'pages/index/index',
     'pages/puzzles/index',
-    'pages/train/index',
-    'pages/guess/index',
     'pages/report/index',
     'pages/profile/index',
-    'pages/mistakes/index',
-    'pages/favorites/index',
+  ],
+  subPackages: [
+    {
+      root: 'pages/train',
+      pages: ['index'],
+    },
+    {
+      root: 'pages/guess',
+      pages: ['index'],
+    },
+    {
+      root: 'pages/mistakes',
+      pages: ['index'],
+    },
+    {
+      root: 'pages/favorites',
+      pages: ['index'],
+    },
   ],
   window: {
     backgroundTextStyle: 'light',

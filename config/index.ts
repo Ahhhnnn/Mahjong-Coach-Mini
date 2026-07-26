@@ -28,6 +28,11 @@ export default defineConfig(async (merge) => {
       enable: false,
     },
     mini: {
+      // 开发预览也需控制体积：关闭 sourceMap，避免 .map 撑爆 2MB 主包上限
+      enableSourceMap: false,
+      optimizeMainPackage: {
+        enable: true,
+      },
       postcss: {
         pxtransform: {
           enable: true,
