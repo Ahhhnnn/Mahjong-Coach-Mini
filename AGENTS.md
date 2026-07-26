@@ -1,3 +1,8 @@
+---
+description:
+alwaysApply: true
+---
+
 # AGENTS.md
 
 四川麻将拆搭训练小程序（Taro 4 + React + TS + SCSS，weapp/H5）。详细说明见 `README.md`。

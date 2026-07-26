@@ -1,136 +1,278 @@
 import { useState } from 'react'
-import { View, Text } from '@tarojs/components'
+import { View, Text, Image } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
+import { Grid, Badge, Button } from '@taroify/core'
+import {
+  Checked,
+  CalendarOutlined,
+  Fire,
+  Aim,
+  Medal,
+  Records,
+  Star,
+  ClockOutlined,
+  BarChartOutlined,
+  Lock,
+} from '@taroify/icons'
 
 import type { DiscardPuzzle } from '../../content/types'
 import { getCachedPuzzles, loadPuzzles } from '../../core/puzzle-service'
 import { isLoggedIn, syncCloudRecordsToLocal } from '../../core/auth'
+import { computeTrainStats, type TrainStats } from '../../core/train-stats-service'
+import { loadMistakes } from '../../core/mistake-service'
+import { listFavorites } from '../../core/favorite-service'
+
+import headerBanner from '../../assets/home/header-banner.jpg'
+import coachBanner from '../../assets/home/coach-banner.jpg'
+import tipBanner from '../../assets/home/tip-banner.jpg'
 
 import './index.scss'
 
+const BRAND = '#1a5c2e'
+const comingSoon = () => Taro.showToast({ title: '即将上线', icon: 'none' })
+
+const emptyStats: TrainStats = {
+  todayDone: 0,
+  todayGoal: 10,
+  streak: 0,
+  total: 0,
+  donePuzzles: 0,
+  accuracy: 0,
+  xp: 0,
+  level: 1,
+  levelXp: 0,
+  levelXpMax: 100,
+  levelTitle: '新手',
+}
+
 export default function DashboardPage() {
   const [puzzles, setPuzzles] = useState<DiscardPuzzle[]>(getCachedPuzzles())
-  const [stats, setStats] = useState({
-    todayDone: 0,
-    todayGoal: 10,
-    streak: 0,
-    total: 0,
-    donePuzzles: 0,
-    accuracy: 0,
-  })
+  const [stats, setStats] = useState<TrainStats>(emptyStats)
+  const [mistakeCount, setMistakeCount] = useState(0)
+  const [favoriteCount, setFavoriteCount] = useState(0)
 
   useDidShow(() => {
-    loadPuzzles().then(setPuzzles)
-
-    const refreshStats = () => {
-      try {
-        const records = Taro.getStorageSync('train_records') || []
-        const today = new Date().toISOString().slice(0, 10)
-        const todayRecords = records.filter(
-          (r: any) => new Date(r.time).toISOString().slice(0, 10) === today
-        )
-        const daySet = new Set(records.map((r: any) => new Date(r.time).toISOString().slice(0, 10)))
-        const reasonable = records.filter((r: any) => r.reasonable).length
-        setStats({
-          todayDone: todayRecords.length,
-          todayGoal: 10,
-          streak: daySet.size,
-          total: records.length,
-          donePuzzles: new Set(records.map((r: any) => r.puzzleId)).size,
-          accuracy: records.length > 0 ? Math.round((reasonable / records.length) * 100) : 0,
-        })
-      } catch { /* ignore */ }
+    const refresh = (list = getCachedPuzzles()) => {
+      setPuzzles(list)
+      setStats(computeTrainStats())
+      setMistakeCount(loadMistakes(list).length)
+      setFavoriteCount(listFavorites().length)
     }
 
-    refreshStats()
+    refresh()
+    loadPuzzles().then(refresh)
 
-    // 已登录时后台同步云端记录，同步完成后刷新统计
     if (isLoggedIn()) {
       syncCloudRecordsToLocal().then((added) => {
-        if (added > 0) refreshStats()
+        if (added > 0) refresh()
       })
     }
   })
 
-  const startTraining = () => {
-    Taro.switchTab({ url: '/pages/puzzles/index' })
-  }
-
-
-  const progress = Math.min(100, (stats.donePuzzles / puzzles.length) * 100)
+  const goPuzzles = () => Taro.switchTab({ url: '/pages/puzzles/index' })
+  const goReport = () => Taro.switchTab({ url: '/pages/report/index' })
+  const puzzleTotal = Math.max(puzzles.length, 1)
+  const basicProgress = Math.min(100, (stats.donePuzzles / puzzleTotal) * 100)
+  const levelProgress = (stats.levelXp / stats.levelXpMax) * 100
 
   return (
-    <View className="dashboard-page">
-      {/* 品牌头部 */}
-      <View className="brand-header">
-        <View className="brand-left">
+    <View className="home-page">
+      {/* 1. Header */}
+      <View className="home-header">
+        <Image className="header-banner" src={headerBanner} mode="aspectFill" />
+        <View className="header-mask" />
+        <View className="header-brand">
           <Text className="brand-name">Mahjong Coach</Text>
-          <Text className="brand-sub">Mahjong Coach</Text>
+          <Text className="brand-sub">川麻训练 · 提升你的胜率</Text>
         </View>
-        <View className="training-status">
-          <Text className="status-text">训练中 · 第{stats.donePuzzles + 1}题 / 共{puzzles.length}题</Text>
-        </View>
-      </View>
-
-      {/* 今日训练卡片 */}
-      <View className="card today-card">
-        <View className="card-title-row">
-          <Text className="card-title">今日训练</Text>
-          <Text className="card-subtitle">每日练习推荐题型</Text>
-        </View>
-        <View className="today-stats">
-          <View className="today-stat">
-            <Text className="stat-num">{stats.todayDone}/{stats.todayGoal}</Text>
-            <Text className="stat-label">今日题数</Text>
+        <View className="header-level">
+          <View className="level-pill">
+            <Text className="level-pill-text">
+              Lv.{stats.level} {stats.levelTitle}
+            </Text>
           </View>
-          <View className="today-stat">
-            <Text className="stat-num">{stats.streak}天</Text>
-            <Text className="stat-label">连续训练</Text>
-          </View>
-          <View className="today-stat">
-            <Text className="stat-num">{stats.total}题</Text>
-            <Text className="stat-label">累计练习</Text>
+          <View className="xp-row">
+            <Text className="xp-label">
+              训练经验 {stats.levelXp}/{stats.levelXpMax}
+            </Text>
+            <View className="xp-bar">
+              <View className="xp-fill" style={{ width: `${levelProgress}%` }} />
+            </View>
           </View>
         </View>
       </View>
 
-      {/* 能力雷达卡片 */}
-      <View className="card radar-card">
-        <View className="card-title-row">
-          <Text className="card-title">能力雷达</Text>
-          <Text className="card-subtitle">基础能力 · 进阶判断 · 策略记忆</Text>
-        </View>
-        <View className="radar-placeholder">
-          <View className="radar-shape">
-            <Text className="radar-center">{stats.accuracy}%</Text>
-            <Text className="radar-center-label">综合正确率</Text>
+      {/* 2. 今日训练 */}
+      <View className="section-card today-card">
+        <View className="section-head">
+          <View className="section-head-left">
+            <Checked size={18} color={BRAND} />
+            <Text className="section-title">今日训练</Text>
           </View>
-          <View className="radar-dims">
-            <View className="dim-item"><Text className="dim-dot" />拆搭效率</View>
-            <View className="dim-item"><Text className="dim-dot" />进张计算</View>
-            <View className="dim-item"><Text className="dim-dot" />防守意识</View>
+          <Text className="section-link" onClick={goReport}>
+            查看详情 ›
+          </Text>
+        </View>
+        <Grid className="today-grid" columns={4} bordered={false} centered>
+          <Grid.Item
+            icon={
+              <View className="stat-icon stat-icon-green">
+                <CalendarOutlined size={20} color={BRAND} />
+              </View>
+            }
+            text={
+              <View className="stat-text">
+                <Text className="stat-num">
+                  {stats.todayDone}/{stats.todayGoal}
+                </Text>
+                <Text className="stat-label">今日题数</Text>
+              </View>
+            }
+          />
+          <Grid.Item
+            icon={
+              <View className="stat-icon stat-icon-orange">
+                <Fire size={20} color="#e67e22" />
+              </View>
+            }
+            text={
+              <View className="stat-text">
+                <Text className="stat-num">{stats.streak}天</Text>
+                <Text className="stat-label">连续训练</Text>
+              </View>
+            }
+          />
+          <Grid.Item
+            icon={
+              <View className="stat-icon stat-icon-green">
+                <Aim size={20} color={BRAND} />
+              </View>
+            }
+            text={
+              <View className="stat-text">
+                <Text className="stat-num">{stats.total}题</Text>
+                <Text className="stat-label">累计训练</Text>
+              </View>
+            }
+          />
+          <Grid.Item
+            icon={
+              <View className="stat-icon stat-icon-gold">
+                <Medal size={20} color="#c9a227" />
+              </View>
+            }
+            text={
+              <View className="stat-text">
+                <Text className="stat-num">{stats.accuracy}%</Text>
+                <Text className="stat-label">正确率</Text>
+              </View>
+            }
+          />
+        </Grid>
+      </View>
+
+      {/* 3. 专属教练 */}
+      <View className="coach-banner">
+        <Image className="coach-bg" src={coachBanner} mode="aspectFill" />
+        <View className="coach-copy">
+          <Text className="coach-title">你的专属川麻教练</Text>
+          <Text className="coach-desc">拆搭指导 · 牌型分析 · 实战提升</Text>
+          <Button
+            className="coach-cta"
+            size="mini"
+            shape="round"
+            color="primary"
+            onClick={comingSoon}
+          >
+            去咨询教练 ›
+          </Button>
+        </View>
+      </View>
+
+      {/* 4. 训练中心 */}
+      <View className="train-center">
+        <View className="section-head section-head-pad">
+          <Text className="section-title section-title-alone">训练中心</Text>
+          <Text className="section-link">全部训练 ›</Text>
+        </View>
+        <View className="mode-row">
+          <View className="mode-card mode-card-basic" onClick={goPuzzles}>
+            <View className="mode-top">
+              <Text className="mode-title">基础拆搭</Text>
+              <Text className="mode-sub">打好基础，稳扎稳打</Text>
+            </View>
+            <View className="mode-progress">
+              <Text className="mode-progress-text">
+                {stats.donePuzzles}/{puzzles.length || 0}
+              </Text>
+              <View className="mode-bar">
+                <View className="mode-fill" style={{ width: `${basicProgress}%` }} />
+              </View>
+            </View>
+          </View>
+
+          <View className="mode-card mode-card-adv">
+            <View className="mode-top">
+              <Text className="mode-title">进阶拆搭</Text>
+              <Text className="mode-sub">提升技巧，灵活应变</Text>
+            </View>
+            <View className="mode-lock">
+              <Lock size={18} color="#9a8f7a" />
+              <Text className="mode-lock-text">敬请期待</Text>
+            </View>
+          </View>
+
+          <View className="mode-card mode-card-guess">
+            <View className="mode-top">
+              <Text className="mode-title">猜测对手</Text>
+              <Text className="mode-sub">读懂牌局，先发制人</Text>
+            </View>
+            <View className="mode-lock">
+              <Lock size={18} color="#7a8fa0" />
+              <Text className="mode-lock-text">敬请期待</Text>
+            </View>
           </View>
         </View>
       </View>
 
-      {/* 训练统计卡片 */}
-      <View className="card progress-card">
-        <View className="card-title-row">
-          <Text className="card-title">训练统计</Text>
-          <Text className="card-subtitle">记录成长轨迹</Text>
-        </View>
-        <View className="progress-info">
-          <Text className="progress-label">基础拆搭训练</Text>
-          <Text className="progress-count">{stats.donePuzzles}/{puzzles.length}</Text>
-        </View>
-        <View className="progress-bar">
-          <View className="progress-fill" style={{ width: `${progress}%` }} />
-        </View>
-        <View className="progress-actions">
-          <View className="btn-start" onClick={startTraining}>
-            <Text className="btn-start-text">开始训练</Text>
-          </View>
-        </View>
+      {/* 5. 学习工具 */}
+      <View className="section-card tools-card">
+        <Text className="section-title section-title-alone tools-title">学习工具</Text>
+        <Grid className="tools-grid" columns={4} bordered={false} centered clickable>
+          <Grid.Item onClick={() => Taro.navigateTo({ url: '/pages/mistakes/index' })}>
+            <Badge content={mistakeCount > 0 ? mistakeCount : undefined} max={99}>
+              <View className="tool-icon">
+                <Records size={26} color={BRAND} />
+              </View>
+            </Badge>
+            <Text className="tool-name">错题本</Text>
+          </Grid.Item>
+          <Grid.Item onClick={() => Taro.navigateTo({ url: '/pages/favorites/index' })}>
+            <Badge content={favoriteCount > 0 ? favoriteCount : undefined} max={99}>
+              <View className="tool-icon">
+                <Star size={26} color={BRAND} />
+              </View>
+            </Badge>
+            <Text className="tool-name">收藏夹</Text>
+          </Grid.Item>
+          <Grid.Item onClick={comingSoon}>
+            <View className="tool-icon">
+              <ClockOutlined size={26} color={BRAND} />
+            </View>
+            <Text className="tool-name">历史记录</Text>
+          </Grid.Item>
+          <Grid.Item onClick={goReport}>
+            <View className="tool-icon">
+              <BarChartOutlined size={26} color={BRAND} />
+            </View>
+            <Text className="tool-name">数据统计</Text>
+          </Grid.Item>
+        </Grid>
+      </View>
+
+      {/* 6. 底部提示 */}
+      <View className="tip-banner">
+        <Image className="tip-img" src={tipBanner} mode="widthFix" />
       </View>
     </View>
   )
