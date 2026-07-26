@@ -2,14 +2,14 @@ import { useState } from 'react'
 import { View, Text, Image, Button, Input } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 
-import type { DiscardPuzzle } from '../../content/types'
 import { getCachedPuzzles, loadPuzzles } from '../../core/puzzle-service'
 import { ensureLogin, uploadAvatar, updateUserProfile, getCachedUser, isLoggedIn, type UserInfo } from '../../core/auth'
+import { loadMistakes } from '../../core/mistake-service'
+import { listFavorites } from '../../core/favorite-service'
 
 import './index.scss'
 
 export default function ProfilePage() {
-  const [puzzles, setPuzzles] = useState<DiscardPuzzle[]>(getCachedPuzzles())
   const [userInfo, setUserInfo] = useState<UserInfo | null>(getCachedUser())
   const [loggedIn, setLoggedIn] = useState(isLoggedIn())
   const [avatarUploading, setAvatarUploading] = useState(false)
@@ -21,35 +21,36 @@ export default function ProfilePage() {
     days: 0,
     xp: 0,
     level: 1,
-    mistakes: [] as { puzzle: DiscardPuzzle; time: number }[],
+    mistakeCount: 0,
+    favoriteCount: 0,
   })
 
   useDidShow(() => {
-    // 刷新登录状态
     setLoggedIn(isLoggedIn())
     setUserInfo(getCachedUser())
-    loadPuzzles().then(setPuzzles)
-    try {
-      const records = Taro.getStorageSync('train_records') || []
-      const days = new Set(records.map((r: any) => new Date(r.time).toISOString().slice(0, 10))).size
-      const reasonable = records.filter((r: any) => r.reasonable).length
-      const xp = records.reduce((s: number, r: any) => s + (r.reasonable ? 10 : 3), 0)
 
-      const wrongRecords = records.filter((r: any) => !r.hit && !r.skipped)
-      const seen = new Set<string>()
-      const mistakes: { puzzle: DiscardPuzzle; time: number }[] = []
-      for (const r of wrongRecords) {
-        if (seen.has(r.puzzleId)) continue
-        seen.add(r.puzzleId)
-        const p = puzzles.find((pp) => pp.id === r.puzzleId)
-        if (p) mistakes.push({ puzzle: p, time: r.time })
-      }
+    const refreshStats = (puzzles = getCachedPuzzles()) => {
+      try {
+        const records = Taro.getStorageSync('train_records') || []
+        const days = new Set(records.map((r: any) => new Date(r.time).toISOString().slice(0, 10))).size
+        const reasonable = records.filter((r: any) => r.reasonable).length
+        const xp = records.reduce((s: number, r: any) => s + (r.reasonable ? 10 : 3), 0)
+        setStats({
+          total: records.length,
+          reasonable,
+          days,
+          xp,
+          level: Math.max(1, Math.floor(xp / 100) + 1),
+          mistakeCount: loadMistakes(puzzles).length,
+          favoriteCount: listFavorites().length,
+        })
+      } catch { /* ignore */ }
+    }
 
-      setStats({ total: records.length, reasonable, days, xp, level: Math.max(1, Math.floor(xp / 100) + 1), mistakes: mistakes.slice(0, 5) })
-    } catch { /* ignore */ }
+    refreshStats()
+    loadPuzzles().then((puzzles) => refreshStats(puzzles))
   })
 
-  // 手动登录（用户主动点击）
   const handleLogin = async () => {
     setLoginLoading(true)
     try {
@@ -68,19 +69,16 @@ export default function ProfilePage() {
     }
   }
 
-  // 选择头像：微信头像选择器回调
   const handleChooseAvatar = async (tempFilePath: string) => {
     if (!tempFilePath) return
     setAvatarUploading(true)
     Taro.showLoading({ title: '上传中…' })
     try {
-      // 上传到云存储
       const fileID = await uploadAvatar(tempFilePath)
       if (!fileID) {
         Taro.showToast({ title: '头像上传失败', icon: 'none' })
         return
       }
-      // 更新云数据库
       const updated = await updateUserProfile({ avatarUrl: fileID })
       if (updated) {
         setUserInfo(updated)
@@ -94,7 +92,6 @@ export default function ProfilePage() {
     }
   }
 
-  // 昵称输入完成
   const handleNicknameConfirm = async (nickname: string) => {
     const name = nickname.trim()
     if (!name) return
@@ -112,20 +109,13 @@ export default function ProfilePage() {
     }
   }
 
-  const goTrain = (puzzleId: string) => {
-    const idx = puzzles.findIndex((p) => p.id === puzzleId)
-    if (idx >= 0) Taro.navigateTo({ url: `/pages/train/index?index=${idx}` })
-  }
-
   const levelProgress = (stats.xp % 100) / 100 * 100
 
   return (
     <View className="profile-page">
-      {/* 个人信息头部 */}
       <View className="profile-header">
         {loggedIn ? (
           <>
-            {/* 已登录：头像 + 昵称编辑 */}
             <Button
               className="avatar-btn"
               openType="chooseAvatar"
@@ -181,7 +171,6 @@ export default function ProfilePage() {
           </>
         ) : (
           <>
-            {/* 未登录：显示登录引导 */}
             <View className="avatar-placeholder-static">
               <Text className="avatar-icon-static">🀄</Text>
             </View>
@@ -197,7 +186,6 @@ export default function ProfilePage() {
         )}
       </View>
 
-      {/* 数据概览 */}
       <View className="stats-card">
         <View className="stat-item">
           <Text className="stat-num">{stats.total}</Text>
@@ -217,34 +205,31 @@ export default function ProfilePage() {
         </View>
       </View>
 
-      {/* 错题本 */}
       <View className="section-card">
         <View className="section-header">
           <Text className="section-title">错题本</Text>
-          <Text className="section-extra">{stats.mistakes.length} 题</Text>
+          <Text className="section-extra">{stats.mistakeCount} 题</Text>
         </View>
-        {stats.mistakes.length === 0 ? (
-          <Text className="section-empty">暂无错题，继续加油！</Text>
-        ) : (
-          stats.mistakes.map((m) => (
-            <View key={m.puzzle.id} className="list-item" onClick={() => goTrain(m.puzzle.id)}>
-              <View className="item-info">
-                <Text className="item-title">{m.puzzle.title || '拆搭训练'}</Text>
-                <Text className="item-sub">基础拆搭 · {new Date(m.time).toLocaleDateString()}</Text>
-              </View>
-              <Text className="item-arrow">›</Text>
-            </View>
-          ))
-        )}
+        <View className="list-item" onClick={() => Taro.navigateTo({ url: '/pages/mistakes/index' })}>
+          <View className="item-info">
+            <Text className="item-title">查看全部错题</Text>
+            <Text className="item-sub">
+              {stats.mistakeCount > 0 ? '按掌握状态复习，巩固薄弱点' : '暂无错题，继续加油！'}
+            </Text>
+          </View>
+          <Text className="item-arrow">›</Text>
+        </View>
       </View>
 
-      {/* 功能菜单 */}
       <View className="section-card">
         <View className="section-header">
           <Text className="section-title">常用功能</Text>
         </View>
-        <View className="list-item">
-          <Text className="item-title">收藏题库</Text>
+        <View className="list-item" onClick={() => Taro.navigateTo({ url: '/pages/favorites/index' })}>
+          <View className="item-info">
+            <Text className="item-title">收藏题库</Text>
+            <Text className="item-sub">已收藏 {stats.favoriteCount} 题</Text>
+          </View>
           <Text className="item-arrow">›</Text>
         </View>
         <View className="list-item">

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { View, Text, Image } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
 
@@ -8,6 +8,7 @@ import { getTileImage } from '../../core/tile-images'
 import { makeRecordId, syncRecordToCloud, type TrainRecord } from '../../core/cloud'
 import { scoreDiscard, type ScoreResult } from '../../core/scoring'
 import { isLoggedIn } from '../../core/auth'
+import { isFavorited, toggleFavorite } from '../../core/favorite-service'
 import type { DiscardPuzzle } from '../../content/types'
 import { getCachedPuzzles, loadPuzzles } from '../../core/puzzle-service'
 import { CoachPanel } from '../../components/coach-panel'
@@ -16,23 +17,52 @@ import './index.scss'
 
 type Phase = 'select' | 'result'
 
+function meldCountSuffix(count: number): string {
+  if (count <= 0) return ''
+  return `，含 ${count} 组副露`
+}
+
+function parseIdsParam(raw?: string): string[] {
+  if (!raw) return []
+  return decodeURIComponent(raw)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
 export default function TrainPage() {
   const router = useRouter()
   const initIndex = Number(router.params.index || 0)
-  const [puzzles, setPuzzles] = useState<DiscardPuzzle[]>(getCachedPuzzles())
-  const [currentIndex, setCurrentIndex] = useState(initIndex)
+  const queueIds = useMemo(() => parseIdsParam(router.params.ids), [router.params.ids])
+  const fromSource = router.params.from || ''
+
+  const [allPuzzles, setAllPuzzles] = useState<DiscardPuzzle[]>(getCachedPuzzles())
+  const [currentIndex, setCurrentIndex] = useState(queueIds.length > 0 ? 0 : initIndex)
   const [selectedTile, setSelectedTile] = useState<Tile | null>(null)
   const [phase, setPhase] = useState<Phase>('select')
   const [tipsLeft, setTipsLeft] = useState(5)
   const [showTip, setShowTip] = useState(false)
   const [result, setResult] = useState<ScoreResult | null>(null)
   const [showCoach, setShowCoach] = useState(false)
+  const [favorited, setFavorited] = useState(false)
 
   useEffect(() => {
-    loadPuzzles().then(setPuzzles)
+    loadPuzzles().then(setAllPuzzles)
   }, [])
 
+  const puzzles = useMemo(() => {
+    if (queueIds.length === 0) return allPuzzles
+    const map = new Map(allPuzzles.map((p) => [p.id, p]))
+    return queueIds.map((id) => map.get(id)).filter(Boolean) as DiscardPuzzle[]
+  }, [allPuzzles, queueIds])
+
   const puzzle = puzzles[currentIndex]
+
+  useEffect(() => {
+    if (puzzle?.id) {
+      setFavorited(isFavorited(puzzle.id))
+    }
+  }, [puzzle?.id])
 
   // 题目尚未加载时显示加载状态
   if (!puzzle) {
@@ -83,10 +113,8 @@ export default function TrainPage() {
     } catch { /* ignore */ }
 
     if (isLoggedIn()) {
-      // 已登录：后台同步到云端
       syncRecordToCloud(record)
     } else {
-      // 未登录：本地已保存，轻提示引导登录
       Taro.showToast({
         title: '进度已保存本地，登录后可云端同步',
         icon: 'none',
@@ -116,7 +144,8 @@ export default function TrainPage() {
       setResult(null)
       setShowTip(false)
     } else {
-      Taro.showToast({ title: '全部完成！🎉', icon: 'none' })
+      const doneMsg = fromSource ? '本轮练习完成' : '全部完成！🎉'
+      Taro.showToast({ title: doneMsg, icon: 'none' })
       setTimeout(() => Taro.navigateBack(), 1500)
     }
   }
@@ -126,6 +155,12 @@ export default function TrainPage() {
     setSelectedTile(null)
     setResult(null)
     setShowTip(false)
+  }
+
+  const handleToggleFavorite = () => {
+    const next = toggleFavorite(puzzle.id)
+    setFavorited(next)
+    Taro.showToast({ title: next ? '已收藏' : '已取消收藏', icon: 'none' })
   }
 
   return (
@@ -154,9 +189,38 @@ export default function TrainPage() {
         </View>
       </View>
 
+      {/* 副露区域（碰/杠） */}
+      {puzzle.melds && puzzle.melds.length > 0 && (
+        <View className="melds-card">
+          <Text className="melds-title">副露（{puzzle.melds.length}组）</Text>
+          <View className="melds-row">
+            {puzzle.melds.map((meld, mi) => {
+              const label = meld.type === 'peng' ? '碰' : '杠'
+              return (
+                <View key={`meld-${mi}`} className="meld-group">
+                  <Text className="meld-label">{label}</Text>
+                  <View className="meld-tiles">
+                    {meld.tiles.map((tile, ti) => (
+                      <Image
+                        key={`meld-${mi}-${ti}`}
+                        className="meld-tile"
+                        src={getTileImage(tile)}
+                        mode="aspectFit"
+                      />
+                    ))}
+                  </View>
+                </View>
+              )
+            })}
+          </View>
+        </View>
+      )}
+
       {/* 手牌区域 */}
       <View className="hand-card">
-        <Text className="hand-title">你的手牌（{puzzle.hand.length}张）</Text>
+        <Text className="hand-title">
+          你的手牌（{puzzle.hand.length}张{meldCountSuffix(puzzle.melds?.length ?? 0)}）
+        </Text>
         <View className="tiles-row">
           {sortedHand.map((tile, i) => {
             const isSelected = selectedTile === tile
@@ -213,21 +277,25 @@ export default function TrainPage() {
       {/* 结果阶段：页内解析 */}
       {phase === 'result' && result && (
         <View className="result-section">
-          {/* 判定结果 */}
           <View className={`judge-row ${result.tier}`}>
-            <Text className="judge-badge">
-              {result.tier === 'excellent' ? '✓ 最优解' : result.tier === 'good' ? '△ 可讨论' : '✗ 非最优'}
-            </Text>
-            <Text className="judge-desc">
-              {result.tier === 'excellent'
-                ? '牌效判断准确，这就是最佳选择！'
-                : result.tier === 'good'
-                ? '思路合理，不过还有更高效的打法。'
-                : '这手牌有更优的选择，看看下面的推荐弃牌。'}
-            </Text>
+            <View className="judge-main">
+              <Text className="judge-badge">
+                {result.tier === 'excellent' ? '✓ 最优解' : result.tier === 'good' ? '△ 可讨论' : '✗ 非最优'}
+              </Text>
+              <Text className="judge-desc">
+                {result.tier === 'excellent'
+                  ? '牌效判断准确，这就是最佳选择！'
+                  : result.tier === 'good'
+                  ? '思路合理，不过还有更高效的打法。'
+                  : '这手牌有更优的选择，看看下面的推荐弃牌。'}
+              </Text>
+            </View>
+            <View className={`btn-fav ${favorited ? 'on' : ''}`} onClick={handleToggleFavorite}>
+              <Text className="btn-fav-icon">{favorited ? '★' : '☆'}</Text>
+              <Text className="btn-fav-text">{favorited ? '已收藏' : '收藏'}</Text>
+            </View>
           </View>
 
-          {/* 牌效对比 */}
           <View className="efficiency-card">
             <View className="eff-row">
               <Text className="eff-label">你的选择</Text>
@@ -245,7 +313,6 @@ export default function TrainPage() {
             )}
           </View>
 
-          {/* 推荐答案 */}
           <View className="recommend-row">
             <Text className="recommend-label">推荐弃牌</Text>
             {puzzle.recommendedDiscards.map((t) => (
@@ -253,7 +320,6 @@ export default function TrainPage() {
             ))}
           </View>
 
-          {/* AI 解析 */}
           <View className="analysis-card">
             <Text className="analysis-title">AI 详细解析</Text>
             <View className="point-item">
@@ -268,7 +334,6 @@ export default function TrainPage() {
             ))}
           </View>
 
-          {/* 操作按钮 */}
           <View className="result-actions">
             <View className="btn-retry" onClick={retry}>
               <Text className="btn-retry-text">重新作答</Text>
@@ -283,7 +348,6 @@ export default function TrainPage() {
         </View>
       )}
 
-      {/* AI 教练聊天面板 */}
       <CoachPanel
         open={showCoach}
         onClose={() => setShowCoach(false)}

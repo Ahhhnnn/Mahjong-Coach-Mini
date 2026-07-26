@@ -6,6 +6,8 @@ export default defineAppConfig({
     'pages/guess/index',
     'pages/report/index',
     'pages/profile/index',
+    'pages/mistakes/index',
+    'pages/favorites/index',
   ],
   window: {
     backgroundTextStyle: 'light',

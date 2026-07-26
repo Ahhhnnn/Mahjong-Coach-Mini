@@ -1,5 +1,6 @@
 import Taro from '@tarojs/taro'
 import { fetchCloudRecords, mergeRecords, syncRecordToCloud, type TrainRecord } from './cloud'
+import { pushLocalFavoritesToCloud, syncCloudFavoritesToLocal } from './favorite-service'
 
 /**
  * 微信小程序登录与用户信息管理
@@ -62,6 +63,8 @@ export async function ensureLogin(): Promise<UserInfo | null> {
     // 登录成功后双向同步：拉取云端记录 + 推送本地记录
     syncCloudRecordsToLocal()
     pushLocalRecordsToCloud()
+    syncCloudFavoritesToLocal()
+    pushLocalFavoritesToCloud()
     return result.user
   } catch (e: any) {
     console.warn('[auth] login error:', e?.message)

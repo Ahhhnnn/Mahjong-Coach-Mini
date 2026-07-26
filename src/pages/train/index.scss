@@ -85,6 +85,66 @@
   }
 }
 
+/* 副露区（碰/杠） */
+.melds-card {
+  margin: 16px 28px 0;
+  background: #fff7e6;
+  border: 1px solid #ffe0a8;
+  border-radius: 12px;
+  padding: 12px 16px;
+
+  .melds-title {
+    font-size: 22px;
+    font-weight: 600;
+    color: #8c5a1a;
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .melds-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .meld-group {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border-radius: 6px;
+    padding: 3px 6px 3px 6px;
+    box-shadow: 0 1px 3px rgba(140, 90, 26, 0.08);
+
+    .meld-label {
+      font-size: 20px;
+      font-weight: 700;
+      color: #c47a1f;
+      margin-right: 4px;
+      min-width: 22px;
+      text-align: center;
+    }
+
+    .meld-tiles {
+      display: flex;
+      align-items: center;
+    }
+
+    .meld-tile {
+      width: 28px;
+      height: 38px;
+      margin-left: -2px;
+      border-radius: 3px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+      background: #fff;
+
+      &:first-child {
+        margin-left: 0;
+      }
+    }
+  }
+}
+
 .tile {
   width: 72px;
   height: 96px;
@@ -216,20 +276,29 @@
 
   .judge-row {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
     border-radius: 16px;
-    padding: 32px 24px;
+    padding: 28px 24px;
     margin-bottom: 16px;
+    gap: 16px;
 
     &.excellent { background: #e8f5e9; }
     &.good { background: #fef9e7; }
     &.poor { background: #fdedec; }
 
+    .judge-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
     .judge-badge {
-      font-size: 40px;
+      font-size: 36px;
       font-weight: 700;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
     &.excellent .judge-badge { color: #1a5c2e; }
@@ -237,9 +306,45 @@
     &.poor .judge-badge { color: #e74c3c; }
 
     .judge-desc {
-      font-size: 26px;
+      font-size: 24px;
       color: #666;
-      text-align: center;
+      text-align: left;
+      line-height: 1.4;
+    }
+
+    .btn-fav {
+      flex-shrink: 0;
+      width: 88px;
+      padding: 12px 0;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.7);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(26, 92, 46, 0.2);
+
+      &.on {
+        background: #1a5c2e;
+        border-color: #1a5c2e;
+
+        .btn-fav-icon,
+        .btn-fav-text {
+          color: #fff;
+        }
+      }
+    }
+
+    .btn-fav-icon {
+      font-size: 32px;
+      color: #1a5c2e;
+      line-height: 1.2;
+    }
+
+    .btn-fav-text {
+      font-size: 18px;
+      color: #1a5c2e;
+      margin-top: 2px;
     }
   }
 
