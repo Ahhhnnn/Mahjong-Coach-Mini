@@ -49,7 +49,7 @@ export default defineAppConfig({
       },
       {
         pagePath: 'pages/report/index',
-        text: '报告',
+        text: '成长',
         iconPath: 'assets/icons/chart.png',
         selectedIconPath: 'assets/icons/chart-active.png',
       },

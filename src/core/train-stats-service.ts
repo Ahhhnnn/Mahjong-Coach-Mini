@@ -25,14 +25,14 @@ export interface TrainStats {
 const TODAY_GOAL = 10
 const XP_PER_LEVEL = 100
 
-function localDayKey(d: Date): string {
+export function localDayKey(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
 
-function shiftDay(key: string, delta: number): string {
+export function shiftDay(key: string, delta: number): string {
   const [y, m, d] = key.split('-').map(Number)
   const dt = new Date(y, m - 1, d)
   dt.setDate(dt.getDate() + delta)

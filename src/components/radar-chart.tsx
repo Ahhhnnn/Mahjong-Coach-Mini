@@ -16,7 +16,7 @@ export default function RadarChart({ values, labels, size = 260 }: RadarChartPro
   const drawn = useRef(false)
 
   useEffect(() => {
-    if (drawn.current) return
+    drawn.current = false
     // 延迟确保 canvas 节点已挂载
     const timer = setTimeout(() => {
       drawRadar()

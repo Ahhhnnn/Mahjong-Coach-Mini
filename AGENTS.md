@@ -9,7 +9,7 @@ alwaysApply: true
 
 ## 优先复用
 
-- **UI/图标**：默认 **Taroify**（`@taroify/core`、`@taroify/icons`）；新组件样式在 `src/app.ts` 按需 import。
+- **UI/图标**：默认 **Taroify**；按需引入靠 `babel-plugin-import`（见 `babel.config.js`），勿全量引入样式。
 - **仓库内**：先搜 `src/components`、`src/core`、`src/hooks`、已有页面，能扩展就不新建平行实现。
 - **自研仅限**：品牌强定制、库无能力、现有抽象无法扩展。
 - **TabBar 图标**：本地 PNG（`src/assets/icons/`），不用 Taroify。
@@ -32,7 +32,7 @@ alwaysApply: true
 
 ## 关键约定
 
-**路由**：TabBar 用 `switchTab`（index / puzzles / report / profile）；子页用 `navigateTo`（train / guess / mistakes / favorites）。
+**路由**：TabBar 用 `switchTab`（index / puzzles / report / profile）；子页用 `navigateTo`（train / guess / mistakes / favorites），挂在 `subPackages`。
 
 **数据**：本地优先、离线可用；云失败静默降级。持久化走 `src/core/*-service.ts`，页面不散落 `getStorageSync`。登录与同步见 `auth.ts`、`cloud.ts`。
 
@@ -41,3 +41,5 @@ alwaysApply: true
 **牌面**：用 `getTileImage` + `Image`，勿用 Unicode 或 emoji 冒充图标。
 
 **AI 教练**：前端 `CoachPanel` + `useCoach` → 云函数 `coachChat`；换模型只改云函数环境变量。
+
+**主包体积（80051）**：微信主包 ≤ 2MB。勿全量引入 Taroify；非 Tab 页放分包；关 sourceMap、忽略 `.map`、开压缩与 `optimizeMainPackage`。改引入方式后需重新 `build:weapp` 再预览。

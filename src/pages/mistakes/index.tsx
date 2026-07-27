@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { View, Text, Image } from '@tarojs/components'
-import Taro, { useDidShow } from '@tarojs/taro'
+import Taro, { useDidShow, useRouter } from '@tarojs/taro'
 
 import { PuzzleListItem } from '../../components/puzzle-list-item'
 import { CHAPTERS } from '../../content/chapters'
@@ -34,16 +34,27 @@ function formatDate(ts: number): string {
 }
 
 export default function MistakesPage() {
+  const router = useRouter()
+  const initialChapter =
+    typeof router.params?.chapterId === 'string' && router.params.chapterId
+      ? router.params.chapterId
+      : 'all'
+
   const [puzzles, setPuzzles] = useState<DiscardPuzzle[]>(getCachedPuzzles())
   const [items, setItems] = useState<MistakeItem[]>([])
   const [filters, setFilters] = useState<MistakeFilters>({
-    chapterId: 'all',
+    chapterId: initialChapter,
     difficulty: 'all',
     timeRange: 'all',
   })
   const [filterOpen, setFilterOpen] = useState<'chapter' | 'difficulty' | 'time' | null>(null)
 
   useDidShow(() => {
+    const chapterParam = router.params?.chapterId
+    if (typeof chapterParam === 'string' && chapterParam) {
+      setFilters((f) => ({ ...f, chapterId: chapterParam }))
+    }
+
     const cached = getCachedPuzzles()
     if (cached.length) {
       setPuzzles(cached)

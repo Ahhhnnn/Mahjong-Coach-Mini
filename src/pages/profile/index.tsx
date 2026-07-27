@@ -20,6 +20,7 @@ import { getCachedPuzzles, loadPuzzles } from '../../core/puzzle-service'
 import { ensureLogin, uploadAvatar, updateUserProfile, getCachedUser, isLoggedIn, type UserInfo } from '../../core/auth'
 import { loadMistakes } from '../../core/mistake-service'
 import { listFavorites } from '../../core/favorite-service'
+import { getLevelTitle } from '../../core/train-stats-service'
 import mascotImg from '../../assets/mascot/panda.png'
 
 import './index.scss'
@@ -191,7 +192,9 @@ export default function ProfilePage() {
                   )}
                 </View>
                 <View className="level-tag">
-                  <Text className="level-tag-text">Lv.{stats.level} 川麻入门</Text>
+                  <Text className="level-tag-text">
+                    Lv.{stats.level} {getLevelTitle(stats.level)}
+                  </Text>
                 </View>
                 <View className="level-bar">
                   <View className="level-fill" style={{ width: `${levelProgress}%` }} />

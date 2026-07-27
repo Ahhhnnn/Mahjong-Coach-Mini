@@ -33,6 +33,10 @@ export default defineConfig(async (merge) => {
       optimizeMainPackage: {
         enable: true,
       },
+      // 多页按需引入 Taroify 时样式顺序可能不一致，忽略无害的 CSS order 警告
+      miniCssExtractPluginOption: {
+        ignoreOrder: true,
+      },
       postcss: {
         pxtransform: {
           enable: true,
