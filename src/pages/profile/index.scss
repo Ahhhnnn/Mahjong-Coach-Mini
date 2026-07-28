@@ -325,3 +325,45 @@
     padding-right: 8px;
   }
 }
+
+.match-banner {
+  margin: 0 24px 24px;
+  border-radius: 20px;
+  padding: 28px 24px;
+  background: linear-gradient(135deg, #1a5c2e 0%, #2d8a4a 100%);
+  box-shadow: 0 8px 24px rgba(26, 92, 46, 0.22);
+}
+
+.match-banner-title {
+  display: block;
+  font-size: 32px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.match-banner-desc {
+  display: block;
+  margin-top: 10px;
+  font-size: 24px;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.4;
+}
+
+.match-banner-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.match-banner-cta {
+  background: #fff !important;
+  color: #1a5c2e !important;
+  border-color: #fff !important;
+  font-weight: 700 !important;
+}
+
+.match-banner-cta-ghost {
+  background: transparent !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.65) !important;
+}

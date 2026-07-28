@@ -3,8 +3,8 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const puzzles = require('./puzzles-data')
 
-// 一次性导入脚本：将 25 道题目写入云数据库 puzzles 集合
-// 部署后在云开发控制台手动触发一次即可
+// 一次性导入脚本：将 puzzles-data.js 写入云数据库 puzzles 集合
+// 部署后在云开发控制台手动触发一次即可（会覆盖同 _id 文档）
 exports.main = async () => {
   const results = []
 

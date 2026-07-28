@@ -21,6 +21,10 @@ import { isLoggedIn, syncCloudRecordsToLocal } from '../../core/auth'
 import { computeTrainStats, type TrainStats } from '../../core/train-stats-service'
 import { loadMistakes } from '../../core/mistake-service'
 import { listFavorites } from '../../core/favorite-service'
+import { listMatches } from '../../core/match-service'
+import { computeMatchStats } from '../../core/match-stats-service'
+import { formatDelta, type SettleUnit } from '../../core/match-types'
+import { getPreferUnit } from '../../core/match-service'
 
 import headerBanner from '../../assets/home/header-banner.jpg'
 import coachBanner from '../../assets/home/coach-banner.jpg'
@@ -50,6 +54,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<TrainStats>(emptyStats)
   const [mistakeCount, setMistakeCount] = useState(0)
   const [favoriteCount, setFavoriteCount] = useState(0)
+  const [matchBrief, setMatchBrief] = useState({ total: 0, winRate: 0, cumText: '+0分' })
 
   useDidShow(() => {
     const refresh = (list = getCachedPuzzles()) => {
@@ -57,6 +62,13 @@ export default function DashboardPage() {
       setStats(computeTrainStats())
       setMistakeCount(loadMistakes(list).length)
       setFavoriteCount(listFavorites().length)
+      const unit: SettleUnit = getPreferUnit()
+      const ms = computeMatchStats(listMatches(), { range: 'month', unit })
+      setMatchBrief({
+        total: ms.total,
+        winRate: ms.winRate,
+        cumText: formatDelta(ms.cumulative, unit),
+      })
     }
 
     refresh()
@@ -71,6 +83,8 @@ export default function DashboardPage() {
 
   const goPuzzles = () => Taro.switchTab({ url: '/pages/puzzles/index' })
   const goReport = () => Taro.switchTab({ url: '/pages/report/index' })
+  const goRecords = () => Taro.switchTab({ url: '/pages/records/index' })
+  const goRecordEdit = () => Taro.navigateTo({ url: '/pages/record-edit/index' })
   const puzzleTotal = Math.max(puzzles.length, 1)
   const basicProgress = Math.min(100, (stats.donePuzzles / puzzleTotal) * 100)
   const levelProgress = (stats.levelXp / stats.levelXpMax) * 100
@@ -171,6 +185,37 @@ export default function DashboardPage() {
         </Grid>
       </View>
 
+      {/* 牌局战绩入口 */}
+      <View className="match-banner">
+        <View className="match-banner-copy">
+          <Text className="match-banner-title">我的牌局战绩</Text>
+          <Text className="match-banner-desc">
+            {matchBrief.total > 0
+              ? `本月 ${matchBrief.total} 场 · 胜率 ${matchBrief.winRate}% · ${matchBrief.cumText}`
+              : '记下每一桌，看清你的胜率与趋势'}
+          </Text>
+          <View className="match-banner-actions">
+            <Button
+              className="match-banner-cta"
+              size="mini"
+              shape="round"
+              color="primary"
+              onClick={goRecords}
+            >
+              查看战绩 ›
+            </Button>
+            <Button
+              className="match-banner-cta match-banner-cta-ghost"
+              size="mini"
+              shape="round"
+              onClick={goRecordEdit}
+            >
+              记一笔
+            </Button>
+          </View>
+        </View>
+      </View>
+
       {/* 3. 专属教练 */}
       <View className="coach-banner">
         <Image className="coach-bg" src={coachBanner} mode="aspectFill" />
@@ -255,11 +300,11 @@ export default function DashboardPage() {
             </Badge>
             <Text className="tool-name">收藏夹</Text>
           </Grid.Item>
-          <Grid.Item onClick={comingSoon}>
+          <Grid.Item onClick={goRecords}>
             <View className="tool-icon">
               <ClockOutlined size={26} color={BRAND} />
             </View>
-            <Text className="tool-name">历史记录</Text>
+            <Text className="tool-name">我的牌局</Text>
           </Grid.Item>
           <Grid.Item onClick={goReport}>
             <View className="tool-icon">

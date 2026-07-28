@@ -21,6 +21,10 @@ import { ensureLogin, uploadAvatar, updateUserProfile, getCachedUser, isLoggedIn
 import { loadMistakes } from '../../core/mistake-service'
 import { listFavorites } from '../../core/favorite-service'
 import { getLevelTitle } from '../../core/train-stats-service'
+import { listMatches } from '../../core/match-service'
+import { computeMatchStats } from '../../core/match-stats-service'
+import { formatDelta, type SettleUnit } from '../../core/match-types'
+import { getPreferUnit } from '../../core/match-service'
 import mascotImg from '../../assets/mascot/panda.png'
 
 import './index.scss'
@@ -43,6 +47,9 @@ export default function ProfilePage() {
     level: 1,
     mistakeCount: 0,
     favoriteCount: 0,
+    matchTotal: 0,
+    matchWinRate: 0,
+    matchCumText: '+0分',
   })
 
   useDidShow(() => {
@@ -56,6 +63,8 @@ export default function ProfilePage() {
         const reasonable = records.filter((r: any) => r.reasonable).length
         const practiced = new Set(records.map((r: any) => r.puzzleId).filter(Boolean)).size
         const xp = records.reduce((s: number, r: any) => s + (r.reasonable ? 10 : 3), 0)
+        const unit: SettleUnit = getPreferUnit()
+        const ms = computeMatchStats(listMatches(), { range: 'month', unit })
         setStats({
           practiced,
           reasonable,
@@ -65,6 +74,9 @@ export default function ProfilePage() {
           level: Math.max(1, Math.floor(xp / 100) + 1),
           mistakeCount: loadMistakes(puzzles).length,
           favoriteCount: listFavorites().length,
+          matchTotal: ms.total,
+          matchWinRate: ms.winRate,
+          matchCumText: formatDelta(ms.cumulative, unit),
         })
       } catch { /* ignore */ }
     }
@@ -133,6 +145,8 @@ export default function ProfilePage() {
 
   const levelProgress = (stats.xp % 100) / 100 * 100
   const displayName = loggedIn ? (userInfo?.nickname || '麻将学员') : '未登录'
+  const goRecords = () => Taro.switchTab({ url: '/pages/records/index' })
+  const goRecordEdit = () => Taro.navigateTo({ url: '/pages/record-edit/index' })
 
   return (
     <View className="profile-page">
@@ -291,6 +305,34 @@ export default function ProfilePage() {
         </Grid>
       </View>
 
+      <View className="match-banner">
+        <Text className="match-banner-title">我的牌局战绩</Text>
+        <Text className="match-banner-desc">
+          {stats.matchTotal > 0
+            ? `本月 ${stats.matchTotal} 场 · 胜率 ${stats.matchWinRate}% · ${stats.matchCumText}`
+            : '真实牌局记账，追踪胜率与趋势'}
+        </Text>
+        <View className="match-banner-actions">
+          <Button
+            className="match-banner-cta"
+            size="mini"
+            shape="round"
+            color="primary"
+            onClick={goRecords}
+          >
+            查看战绩 ›
+          </Button>
+          <Button
+            className="match-banner-cta match-banner-cta-ghost"
+            size="mini"
+            shape="round"
+            onClick={goRecordEdit}
+          >
+            记一笔
+          </Button>
+        </View>
+      </View>
+
       <View className="section-card">
         <Text className="section-title">学习中心</Text>
         <Grid className="center-grid" columns={4} bordered={false} centered clickable>
@@ -308,12 +350,12 @@ export default function ProfilePage() {
             <Text className="center-name">收藏夹</Text>
             <Text className="center-sub">{stats.favoriteCount} 题</Text>
           </Grid.Item>
-          <Grid.Item onClick={comingSoon}>
+          <Grid.Item onClick={goRecords}>
             <View className="center-icon center-icon-light">
               <ClockOutlined size={26} color={BRAND} />
             </View>
-            <Text className="center-name">历史记录</Text>
-            <Text className="center-sub">{stats.total} 题</Text>
+            <Text className="center-name">我的牌局</Text>
+            <Text className="center-sub">{stats.matchTotal} 场</Text>
           </Grid.Item>
           <Grid.Item onClick={() => Taro.switchTab({ url: '/pages/report/index' })}>
             <View className="center-icon center-icon-light">
