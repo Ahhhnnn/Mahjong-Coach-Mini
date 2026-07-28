@@ -73,8 +73,8 @@ export default function FavoritesPage() {
       Taro.showToast({ title: '暂无收藏', icon: 'none' })
       return
     }
-    const ids = shuffle(rows.map((r) => r.puzzle.id)).join(',')
-    Taro.navigateTo({ url: `/pages/train/index?ids=${ids}&from=favorites` })
+    const ids = encodeURIComponent(shuffle(rows.map((r) => r.puzzle.id)).join(','))
+    Taro.navigateTo({ url: `/pages/train/index?ids=${ids}&start=0&from=favorites` })
   }
 
   return (
@@ -108,8 +108,9 @@ export default function FavoritesPage() {
                 </View>
               }
               onClick={() => {
+                const ids = encodeURIComponent(rows.map((r) => r.puzzle.id).join(','))
                 Taro.navigateTo({
-                  url: `/pages/train/index?ids=${row.fav.puzzleId}&from=favorites`,
+                  url: `/pages/train/index?ids=${ids}&start=${i}&from=favorites`,
                 })
               }}
             />

@@ -151,10 +151,16 @@ export function upsertMatch(
     location: input.location?.trim() || undefined,
     settleUnit: input.settleUnit || 'score',
     result,
-    players: input.players.map((p) => ({
-      ...p,
-      name: (p.name || '').trim() || (p.isSelf ? '我' : '玩家'),
-    })),
+    players: input.players.map((p, i) => {
+      let name = (p.name || '').trim()
+      if (p.isSelf) {
+        name = name || '我'
+      } else if (!name || name === '玩家') {
+        // 避免多名「玩家」在排行榜里被合并成一人
+        name = `玩家${i + 1}`
+      }
+      return { ...p, name }
+    }),
     performance: input.performance,
     reasons: input.reasons?.length ? input.reasons : undefined,
     note: input.note?.trim() || undefined,

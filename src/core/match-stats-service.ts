@@ -162,9 +162,13 @@ export function buildRanking(records: MatchRecord[], unit: SettleUnit): RankEntr
   const map = new Map<string, RankEntry>()
 
   for (const r of records) {
-    for (const p of r.players) {
-      const key = p.isSelf ? '__self__' : p.name.trim()
-      if (!key) continue
+    r.players.forEach((p, seatIndex) => {
+      const rawName = (p.name || '').trim()
+      // 历史数据里多名未命名对手都叫「玩家」，按座位拆开，避免榜上只剩两人
+      const isAnon = !rawName || rawName === '玩家'
+      const key = p.isSelf ? '__self__' : isAnon ? `__seat_${seatIndex}` : rawName
+      if (!key) return
+
       const delta =
         unit === r.settleUnit
           ? getPlayerDelta(p, unit)
@@ -173,22 +177,28 @@ export function buildRanking(records: MatchRecord[], unit: SettleUnit): RankEntr
                 unit === 'score' ? typeof p.scoreDelta === 'number' : typeof p.moneyDelta === 'number'
               return has ? getPlayerDelta(p, unit) : getPlayerDelta(p, r.settleUnit)
             })()
+
+      const displayName = p.isSelf ? '我' : isAnon ? `玩家${seatIndex + 1}` : rawName
       const exist = map.get(key)
       if (exist) {
         exist.total += delta
         exist.games += 1
       } else {
         map.set(key, {
-          name: p.isSelf ? '我' : p.name.trim(),
+          name: displayName,
           isSelf: !!p.isSelf,
           total: delta,
           games: 1,
         })
       }
-    }
+    })
   }
 
-  return Array.from(map.values()).sort((a, b) => b.total - a.total)
+  return Array.from(map.values()).sort((a, b) => {
+    if (b.total !== a.total) return b.total - a.total
+    if (b.games !== a.games) return b.games - a.games
+    return a.name.localeCompare(b.name, 'zh')
+  })
 }
 
 function reasonLabel(r: MatchReason): string {
@@ -259,7 +269,7 @@ export function buildAiInsight(records: MatchRecord[]): AiInsight {
   const recommendUrl =
     topReason === 'defense' || topReason === 'riichi_choice'
       ? '/pages/guess/index'
-      : '/pages/puzzles/index'
+      : '/pages/basic/index'
 
   const summaryLines = [
     `近${recent.length || 0}场胜率 ${decisive ? Math.round(winRate * 100) : 0}%`,

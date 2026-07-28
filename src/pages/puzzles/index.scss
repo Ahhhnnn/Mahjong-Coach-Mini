@@ -1,202 +1,193 @@
-.puzzles-page {
+.train-hub {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: #f7f8f5;
+  padding-bottom: 48px;
+  box-sizing: border-box;
 }
 
-.page-header {
-  background: #fff;
-  padding: 32px 28px 24px;
-  border-bottom: 1px solid #f0f0f0;
-
-  .header-top {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-
-    .header-title {
-      font-size: 38px;
-      font-weight: 700;
-      color: #1a1a1a;
-    }
-
-    .header-count {
-      font-size: 24px;
-      color: #1a5c2e;
-      background: #e8f5e9;
-      padding: 6px 16px;
-      border-radius: 8px;
-    }
-  }
-
-  .header-desc {
-    font-size: 24px;
-    color: #999;
-    margin-top: 10px;
-    display: block;
-  }
+.hub-header {
+  padding: 36px 32px 20px;
 }
 
-.chapter-list {
-  padding: 20px 28px;
+.hub-title {
+  display: block;
+  font-size: 44px;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.25;
 }
 
-.chapter-card {
-  background: #f9fbfc;
-  border-radius: 16px;
-  margin-bottom: 16px;
+.hub-desc {
+  display: block;
+  margin-top: 12px;
+  font-size: 26px;
+  color: #8a8a8a;
+  line-height: 1.45;
+}
+
+.hub-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 8px 28px 0;
+}
+
+.hub-card {
+  position: relative;
+  height: 220px;
+  border-radius: 24px;
   overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+}
 
-  &.locked {
-    opacity: 0.6;
-  }
+.hub-card-bg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
 
-  .chapter-header {
-    display: flex;
-    align-items: center;
-    padding: 24px;
+.hub-card-body {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  padding: 28px 24px 28px 28px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.28) 42%,
+    rgba(255, 255, 255, 0) 72%
+  );
+}
 
-    .chapter-index {
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #1a5c2e, #2d8a4e);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-right: 20px;
-      flex-shrink: 0;
+.hub-card-left {
+  flex: 1;
+  min-width: 0;
+  padding-right: 16px;
+}
 
-      .chapter-index-text {
-        font-size: 28px;
-        font-weight: 700;
-        color: #fff;
-      }
-    }
+.hub-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
 
-    .chapter-info {
-      flex: 1;
+.hub-card-title {
+  font-size: 34px;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.3;
+}
 
-      .chapter-title-row {
-        display: flex;
-        align-items: center;
-        gap: 10px;
+.hub-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 20px;
+  line-height: 1.3;
+}
 
-        .chapter-title {
-          font-size: 28px;
-          font-weight: 600;
-          color: #333;
-        }
+.hub-tag-green {
+  background: rgba(26, 92, 46, 0.12);
+  color: #1a5c2e;
+}
 
-        .lock-icon {
-          font-size: 22px;
-        }
-      }
+.hub-tag-orange {
+  background: rgba(196, 122, 42, 0.14);
+}
 
-      .chapter-desc {
-        font-size: 22px;
-        color: #999;
-        margin-top: 6px;
-        display: block;
-      }
+.hub-tag-blue {
+  background: rgba(74, 122, 154, 0.14);
+}
 
-      .chapter-progress {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-top: 12px;
+.hub-tag-text {
+  font-size: 20px;
+  line-height: 1.3;
+}
 
-        .chapter-bar {
-          flex: 1;
-          height: 8px;
-          background: #e8e8e8;
-          border-radius: 4px;
-          overflow: hidden;
+.hub-tag-orange .hub-tag-text {
+  color: #c47a2a;
+}
 
-          .chapter-bar-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #1a5c2e, #4caf50);
-            border-radius: 4px;
-            transition: width 0.3s;
-          }
-        }
+.hub-tag-blue .hub-tag-text {
+  color: #4a7a9a;
+}
 
-        .chapter-progress-text {
-          font-size: 22px;
-          color: #666;
-          flex-shrink: 0;
-        }
-      }
-    }
+.hub-card-sub {
+  display: block;
+  margin-top: 10px;
+  font-size: 24px;
+  color: #777;
+  line-height: 1.4;
+}
 
-    .chapter-arrow {
-      font-size: 36px;
-      color: #ccc;
-      margin-left: 12px;
-      transform: rotate(90deg);
-      transition: transform 0.2s;
+.hub-progress {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 28px;
+}
 
-      &.expanded {
-        transform: rotate(-90deg);
-      }
-    }
-  }
+.hub-bar {
+  width: 160px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(26, 92, 46, 0.15);
+  overflow: hidden;
+}
 
-  .puzzle-items {
-    border-top: 1px solid #f0f0f0;
-    padding: 8px 24px;
+.hub-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #1a5c2e;
+}
 
-    .puzzle-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 22px 0;
-      border-bottom: 1px solid #f5f5f5;
+.hub-progress-text {
+  font-size: 22px;
+  font-weight: 600;
+  color: #1a5c2e;
+  line-height: 1.2;
+}
 
-      &:last-child {
-        border-bottom: none;
-      }
+.hub-lock-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 28px;
+}
 
-      .puzzle-left {
-        .puzzle-name {
-          font-size: 26px;
-          color: #333;
-          display: block;
-        }
+.hub-lock-text {
+  font-size: 24px;
+  color: #999;
+  line-height: 1.3;
+}
 
-        .puzzle-difficulty {
-          font-size: 20px;
-          color: #f5a623;
-          margin-top: 4px;
-          display: block;
-        }
-      }
+.hub-arrow {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 
-      .puzzle-status {
-        font-size: 22px;
-        padding: 6px 16px;
-        border-radius: 8px;
+.hub-arrow-green {
+  background: #1a5c2e;
+}
 
-        &.excellent {
-          color: #1a5c2e;
-          background: #e8f5e9;
-        }
+.hub-arrow-orange {
+  background: #d4893a;
+}
 
-        &.good {
-          color: #f5a623;
-          background: #fef9e7;
-        }
-
-        &.poor {
-          color: #e74c3c;
-          background: #fdedec;
-        }
-
-        &.none {
-          color: #999;
-          background: #f5f5f5;
-        }
-      }
-    }
-  }
+.hub-arrow-blue {
+  background: #5a8fb0;
 }

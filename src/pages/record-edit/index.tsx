@@ -226,8 +226,11 @@ export default function RecordEditPage() {
 
     const parsed = players.map((p, i) => {
       const num = nums[i]
+      let name = p.name.trim()
+      if (p.isSelf) name = name || '我'
+      else if (!name || name === '玩家') name = `玩家${i + 1}`
       return {
-        name: p.name.trim() || (p.isSelf ? '我' : '玩家'),
+        name,
         isSelf: p.isSelf,
         scoreDelta: settleUnit === 'score' ? num : undefined,
         moneyDelta: settleUnit === 'money' ? num : undefined,

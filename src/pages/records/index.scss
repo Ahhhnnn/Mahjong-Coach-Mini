@@ -274,8 +274,18 @@
   color: #1a5c2e;
 }
 
-.rank-total.neg {
-  color: #e74c3c;
+.rank-row-empty {
+  opacity: 0.72;
+}
+
+.rank-name-empty {
+  color: #999 !important;
+  font-weight: 500 !important;
+}
+
+.muted-total {
+  color: #bbb !important;
+  font-weight: 600 !important;
 }
 
 .ai-card {

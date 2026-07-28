@@ -10,6 +10,7 @@ import { scoreDiscard, type ScoreResult } from '../../core/scoring'
 import { isLoggedIn } from '../../core/auth'
 import { isFavorited, toggleFavorite } from '../../core/favorite-service'
 import type { DiscardPuzzle } from '../../content/types'
+import { CHAPTERS } from '../../content/chapters'
 import { getCachedPuzzles, loadPuzzles } from '../../core/puzzle-service'
 import { CoachPanel } from '../../components/coach-panel'
 
@@ -30,14 +31,48 @@ function parseIdsParam(raw?: string): string[] {
     .filter(Boolean)
 }
 
+function parseStartIndex(params: Record<string, string | undefined>, queueLen: number): number {
+  // 优先 start（0-based）；兼容旧链接 index。有 ids 队列时默认从 0 开始
+  const raw = params.start ?? (queueLen > 0 ? undefined : params.index)
+  if (raw == null || raw === '') return 0
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n < 0) return 0
+  if (queueLen > 0) return Math.min(Math.floor(n), queueLen - 1)
+  return Math.floor(n)
+}
+
+function resolveChapter(puzzleId: string) {
+  const chapterIndex = CHAPTERS.findIndex((ch) => ch.puzzles.includes(puzzleId))
+  if (chapterIndex < 0) {
+    return { chapterNo: 0, title: '拆搭训练', inChapter: 0, chapterTotal: 0 }
+  }
+  const ch = CHAPTERS[chapterIndex]
+  return {
+    chapterNo: chapterIndex + 1,
+    title: ch.title,
+    inChapter: ch.puzzles.indexOf(puzzleId) + 1,
+    chapterTotal: ch.puzzles.length,
+  }
+}
+
+function sourceLabel(from: string): string {
+  if (from === 'favorites') return '收藏夹'
+  if (from === 'mistakes') return '错题本'
+  if (from === 'chapter') return ''
+  return ''
+}
+
 export default function TrainPage() {
   const router = useRouter()
-  const initIndex = Number(router.params.index || 0)
   const queueIds = useMemo(() => parseIdsParam(router.params.ids), [router.params.ids])
   const fromSource = router.params.from || ''
+  const initIndex = useMemo(
+    () => parseStartIndex(router.params as Record<string, string | undefined>, queueIds.length),
+    [router.params, queueIds.length],
+  )
 
   const [allPuzzles, setAllPuzzles] = useState<DiscardPuzzle[]>(getCachedPuzzles())
-  const [currentIndex, setCurrentIndex] = useState(queueIds.length > 0 ? 0 : initIndex)
+  const [currentIndex, setCurrentIndex] = useState(initIndex)
   const [selectedTile, setSelectedTile] = useState<Tile | null>(null)
   const [phase, setPhase] = useState<Phase>('select')
   const [tipsLeft, setTipsLeft] = useState(5)
@@ -56,6 +91,12 @@ export default function TrainPage() {
     return queueIds.map((id) => map.get(id)).filter(Boolean) as DiscardPuzzle[]
   }, [allPuzzles, queueIds])
 
+  // 题目异步加载后，确保下标不越界
+  useEffect(() => {
+    if (puzzles.length === 0) return
+    setCurrentIndex((i) => Math.min(Math.max(0, i), puzzles.length - 1))
+  }, [puzzles.length])
+
   const puzzle = puzzles[currentIndex]
 
   useEffect(() => {
@@ -68,7 +109,14 @@ export default function TrainPage() {
   if (!puzzle) {
     return (
       <View className="train-page">
-        <View className="info-card"><Text className="hand-title">加载中...</Text></View>
+        <View className="top-bar">
+          <View className="top-bar-deco" />
+          <Text className="progress-text">加载中...</Text>
+          <View className="progress-bar">
+            <View className="progress-fill" style={{ width: '12%' }} />
+          </View>
+        </View>
+        <View className="info-card"><Text className="hand-title">正在准备题目</Text></View>
       </View>
     )
   }
@@ -163,13 +211,32 @@ export default function TrainPage() {
     Taro.showToast({ title: next ? '已收藏' : '已取消收藏', icon: 'none' })
   }
 
+  const chapter = resolveChapter(puzzle.id)
+  const fromLabel = sourceLabel(fromSource)
+  const progressText =
+    fromSource === 'chapter' || !fromSource
+      ? `第${chapter.inChapter || currentIndex + 1}题 / 共${chapter.chapterTotal || puzzles.length}题`
+      : `本章第${chapter.inChapter}题 · 本轮 ${currentIndex + 1}/${puzzles.length}`
+
   return (
-    <View className="train-page">
+    <View className={`train-page phase-${phase}`}>
       {/* 顶部进度 */}
       <View className="top-bar">
-        <Text className="progress-text">第{currentIndex + 1}题 / 共{puzzles.length}题</Text>
+        <View className="top-bar-deco" />
+        {fromLabel ? (
+          <Text className="source-tag">{fromLabel}</Text>
+        ) : null}
+        <Text className="chapter-text">
+          {chapter.chapterNo > 0 ? `第${chapter.chapterNo}章 · ${chapter.title}` : chapter.title}
+        </Text>
+        <Text className="progress-text">{progressText}</Text>
         <View className="progress-bar">
-          <View className="progress-fill" style={{ width: `${((currentIndex + 1) / puzzles.length) * 100}%` }} />
+          <View
+            className="progress-fill"
+            style={{
+              width: `${((currentIndex + 1) / Math.max(puzzles.length, 1)) * 100}%`,
+            }}
+          />
         </View>
       </View>
 
@@ -261,15 +328,18 @@ export default function TrainPage() {
       {phase === 'select' && (
         <View className="bottom-actions">
           <View className="action-btns">
-            <View className="btn-hint" onClick={handleTip}>
-              <Text className="btn-hint-text">提示（{tipsLeft}）</Text>
+            <View className={`btn-hint ${tipsLeft <= 0 ? 'disabled' : ''}`} onClick={handleTip}>
+              <Text className="btn-hint-icon">💡</Text>
+              <Text className="btn-hint-text">提示 · {tipsLeft}</Text>
             </View>
             <View className="btn-skip" onClick={handleSkip}>
-              <Text className="btn-skip-text">跳过本题</Text>
+              <Text className="btn-skip-text">跳过</Text>
             </View>
           </View>
           <View className={`btn-submit ${selectedTile ? 'active' : ''}`} onClick={handleSubmit}>
-            <Text className="btn-submit-text">提交答案</Text>
+            <Text className="btn-submit-text">
+              {selectedTile ? '提交答案' : '请先选一张牌'}
+            </Text>
           </View>
         </View>
       )}
@@ -335,14 +405,16 @@ export default function TrainPage() {
           </View>
 
           <View className="result-actions">
-            <View className="btn-retry" onClick={retry}>
-              <Text className="btn-retry-text">重新作答</Text>
-            </View>
-            <View className="btn-coach-ask" onClick={() => setShowCoach(true)}>
-              <Text className="btn-coach-ask-text">追问教练</Text>
+            <View className="result-actions-row">
+              <View className="btn-retry" onClick={retry}>
+                <Text className="btn-retry-text">重新作答</Text>
+              </View>
+              <View className="btn-coach-ask" onClick={() => setShowCoach(true)}>
+                <Text className="btn-coach-ask-text">追问教练</Text>
+              </View>
             </View>
             <View className="btn-next" onClick={nextPuzzle}>
-              <Text className="btn-next-text">{currentIndex < puzzles.length - 1 ? '继续下一题' : '完成'}</Text>
+              <Text className="btn-next-text">{currentIndex < puzzles.length - 1 ? '继续下一题' : '完成本轮'}</Text>
             </View>
           </View>
         </View>

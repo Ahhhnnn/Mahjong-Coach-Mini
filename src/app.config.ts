@@ -8,6 +8,10 @@ export default defineAppConfig({
   ],
   subPackages: [
     {
+      root: 'pages/basic',
+      pages: ['index'],
+    },
+    {
       root: 'pages/train',
       pages: ['index'],
     },

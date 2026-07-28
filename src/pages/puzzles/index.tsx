@@ -1,139 +1,114 @@
 import { useState } from 'react'
-import { View, Text } from '@tarojs/components'
+import { View, Text, Image } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
+import { Arrow, Lock } from '@taroify/icons'
 
-import type { DiscardPuzzle } from '../../content/types'
 import { getCachedPuzzles, loadPuzzles } from '../../core/puzzle-service'
-import { CHAPTERS, FREE_CHAPTERS } from '../../content/chapters'
+import { computeTrainStats } from '../../core/train-stats-service'
+
+import bgBasic from '../../assets/train/bg-basic.jpg'
+import bgAdvanced from '../../assets/train/bg-advanced.jpg'
+import bgGuess from '../../assets/train/bg-guess.jpg'
 
 import './index.scss'
 
-type TrainRecordItem = { puzzleId: string; hit: boolean; reasonable: boolean; time: number }
-
-export default function PuzzlesPage() {
-  const [puzzles, setPuzzles] = useState<DiscardPuzzle[]>(getCachedPuzzles())
-  const [expandedChapter, setExpandedChapter] = useState<string | null>('ch1')
-  const [doneSet, setDoneSet] = useState<Set<string>>(new Set())
-  const [bestScores, setBestScores] = useState<Record<string, number>>({})
+export default function TrainHubPage() {
+  const [donePuzzles, setDonePuzzles] = useState(0)
+  const [puzzleTotal, setPuzzleTotal] = useState(0)
 
   useDidShow(() => {
-    loadPuzzles().then(setPuzzles)
-    try {
-      const records: TrainRecordItem[] = Taro.getStorageSync('train_records') || []
-      const done = new Set(records.map((r) => r.puzzleId))
-      setDoneSet(done)
-
-      // 每题最高表现: hit=2, reasonable=1
-      const scores: Record<string, number> = {}
-      for (const r of records) {
-        const s = r.hit ? 2 : r.reasonable ? 1 : 0
-        if (!scores[r.puzzleId] || s > scores[r.puzzleId]) {
-          scores[r.puzzleId] = s
-        }
-      }
-      setBestScores(scores)
-    } catch { /* ignore */ }
+    const refresh = () => {
+      const list = getCachedPuzzles()
+      const stats = computeTrainStats()
+      setPuzzleTotal(list.length)
+      setDonePuzzles(stats.donePuzzles)
+    }
+    refresh()
+    loadPuzzles().then(refresh)
   })
 
-  const chapterDone = (chapterPuzzles: string[]) =>
-    chapterPuzzles.filter((id) => doneSet.has(id)).length
+  const basicProgress = puzzleTotal > 0
+    ? Math.min(100, (donePuzzles / puzzleTotal) * 100)
+    : 0
 
-  const isChapterUnlocked = (index: number) => {
-    if (index < FREE_CHAPTERS) return true
-    const prev = CHAPTERS[index - 1]
-    return chapterDone(prev.puzzles) >= prev.puzzles.length
-  }
-
-  const toggleChapter = (chapterId: string, index: number) => {
-    if (!isChapterUnlocked(index)) {
-      Taro.showToast({ title: '完成上一章后解锁', icon: 'none' })
-      return
-    }
-    setExpandedChapter(expandedChapter === chapterId ? null : chapterId)
-  }
-
-  const goTrain = (puzzleId: string) => {
-    const idx = puzzles.findIndex((p) => p.id === puzzleId)
-    if (idx >= 0) Taro.navigateTo({ url: `/pages/train/index?index=${idx}` })
-  }
-
-  const getPuzzleStatus = (puzzleId: string) => {
-    if (!doneSet.has(puzzleId)) return { text: '未练习', cls: 'none' }
-    const s = bestScores[puzzleId]
-    if (s === 2) return { text: '优秀', cls: 'excellent' }
-    if (s === 1) return { text: '良好', cls: 'good' }
-    return { text: '需加强', cls: 'poor' }
-  }
-
-  const totalDone = puzzles.filter((p) => doneSet.has(p.id)).length
+  const goBasic = () => Taro.navigateTo({ url: '/pages/basic/index' })
+  const comingSoon = () => Taro.showToast({ title: '敬请期待', icon: 'none' })
 
   return (
-    <View className="puzzles-page">
-      {/* 头部统计 */}
-      <View className="page-header">
-        <View className="header-top">
-          <Text className="header-title">AI 拆搭训练</Text>
-          <Text className="header-count">{totalDone}/{puzzles.length} 题</Text>
-        </View>
-        <Text className="header-desc">专注拆搭练习，AI 实时解析你的每一步决策</Text>
+    <View className="train-hub">
+      <View className="hub-header">
+        <Text className="hub-title">全部训练</Text>
+        <Text className="hub-desc">科学训练，循序渐进提升你的牌技水平</Text>
       </View>
 
-      {/* 章节列表 */}
-      <View className="chapter-list">
-        {CHAPTERS.map((chapter, ci) => {
-          const unlocked = isChapterUnlocked(ci)
-          const expanded = expandedChapter === chapter.id
-          const done = chapterDone(chapter.puzzles)
-          const progress = (done / chapter.puzzles.length) * 100
-          const chapterPuzzles = chapter.puzzles
-            .map((id) => puzzles.find((p) => p.id === id))
-            .filter(Boolean) as DiscardPuzzle[]
-
-          return (
-            <View key={chapter.id} className={`chapter-card ${!unlocked ? 'locked' : ''}`}>
-              {/* 章节头部 */}
-              <View className="chapter-header" onClick={() => toggleChapter(chapter.id, ci)}>
-                <View className="chapter-index">
-                  <Text className="chapter-index-text">{ci + 1}</Text>
-                </View>
-                <View className="chapter-info">
-                  <View className="chapter-title-row">
-                    <Text className="chapter-title">{chapter.title}</Text>
-                    {!unlocked && <Text className="lock-icon">🔒</Text>}
-                  </View>
-                  <Text className="chapter-desc">{chapter.desc}</Text>
-                  <View className="chapter-progress">
-                    <View className="chapter-bar">
-                      <View className="chapter-bar-fill" style={{ width: `${progress}%` }} />
-                    </View>
-                    <Text className="chapter-progress-text">{done}/{chapter.puzzles.length}</Text>
-                  </View>
-                </View>
-                <Text className={`chapter-arrow ${expanded ? 'expanded' : ''}`}>›</Text>
+      <View className="hub-list">
+        <View className="hub-card" onClick={goBasic}>
+          <Image className="hub-card-bg" src={bgBasic} mode="aspectFill" />
+          <View className="hub-card-body">
+            <View className="hub-card-left">
+              <View className="hub-title-row">
+                <Text className="hub-card-title">基础拆搭</Text>
+                <Text className="hub-tag hub-tag-green">入门必练</Text>
               </View>
-
-              {/* 展开的题目列表 */}
-              {expanded && unlocked && (
-                <View className="puzzle-items">
-                  {chapterPuzzles.map((p, pi) => {
-                    const status = getPuzzleStatus(p.id)
-                    return (
-                      <View key={p.id} className="puzzle-item" onClick={() => goTrain(p.id)}>
-                        <View className="puzzle-left">
-                          <Text className="puzzle-name">
-                            {pi + 1}. {p.title || '拆搭训练'}
-                          </Text>
-                          <Text className="puzzle-difficulty">{'★'.repeat(p.difficulty)}</Text>
-                        </View>
-                        <Text className={`puzzle-status ${status.cls}`}>{status.text}</Text>
-                      </View>
-                    )
-                  })}
+              <Text className="hub-card-sub">打好基础，稳扎稳打</Text>
+              <View className="hub-progress">
+                <View className="hub-bar">
+                  <View className="hub-fill" style={{ width: `${basicProgress}%` }} />
                 </View>
-              )}
+                <Text className="hub-progress-text">{donePuzzles}/{puzzleTotal || 0} 题</Text>
+              </View>
             </View>
-          )
-        })}
+            <View className="hub-arrow hub-arrow-green">
+              <Arrow size={18} color="#fff" />
+            </View>
+          </View>
+        </View>
+
+        <View className="hub-card" onClick={comingSoon}>
+          <Image className="hub-card-bg" src={bgAdvanced} mode="aspectFill" />
+          <View className="hub-card-body">
+            <View className="hub-card-left">
+              <View className="hub-title-row">
+                <Text className="hub-card-title">进阶拆搭</Text>
+                <View className="hub-tag hub-tag-orange">
+                  <Lock size={12} color="#c47a2a" />
+                  <Text className="hub-tag-text">进阶提升</Text>
+                </View>
+              </View>
+              <Text className="hub-card-sub">提升技巧，灵活应变</Text>
+              <View className="hub-lock-row">
+                <Lock size={16} color="#b89a78" />
+                <Text className="hub-lock-text">敬请期待</Text>
+              </View>
+            </View>
+            <View className="hub-arrow hub-arrow-orange">
+              <Arrow size={18} color="#fff" />
+            </View>
+          </View>
+        </View>
+
+        <View className="hub-card" onClick={comingSoon}>
+          <Image className="hub-card-bg" src={bgGuess} mode="aspectFill" />
+          <View className="hub-card-body">
+            <View className="hub-card-left">
+              <View className="hub-title-row">
+                <Text className="hub-card-title">猜测对手</Text>
+                <View className="hub-tag hub-tag-blue">
+                  <Lock size={12} color="#4a7a9a" />
+                  <Text className="hub-tag-text">高手进阶</Text>
+                </View>
+              </View>
+              <Text className="hub-card-sub">读懂牌局，先发制人</Text>
+              <View className="hub-lock-row">
+                <Lock size={16} color="#8aa0b0" />
+                <Text className="hub-lock-text">敬请期待</Text>
+              </View>
+            </View>
+            <View className="hub-arrow hub-arrow-blue">
+              <Arrow size={18} color="#fff" />
+            </View>
+          </View>
+        </View>
       </View>
     </View>
   )

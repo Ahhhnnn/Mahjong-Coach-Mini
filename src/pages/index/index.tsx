@@ -81,7 +81,8 @@ export default function DashboardPage() {
     }
   })
 
-  const goPuzzles = () => Taro.switchTab({ url: '/pages/puzzles/index' })
+  const goAllTrain = () => Taro.switchTab({ url: '/pages/puzzles/index' })
+  const goBasic = () => Taro.navigateTo({ url: '/pages/basic/index' })
   const goReport = () => Taro.switchTab({ url: '/pages/report/index' })
   const goRecords = () => Taro.switchTab({ url: '/pages/records/index' })
   const goRecordEdit = () => Taro.navigateTo({ url: '/pages/record-edit/index' })
@@ -238,10 +239,10 @@ export default function DashboardPage() {
       <View className="train-center">
         <View className="section-head section-head-pad">
           <Text className="section-title section-title-alone">训练中心</Text>
-          <Text className="section-link">全部训练 ›</Text>
+          <Text className="section-link" onClick={goAllTrain}>全部训练 ›</Text>
         </View>
         <View className="mode-row">
-          <View className="mode-card mode-card-basic" onClick={goPuzzles}>
+          <View className="mode-card mode-card-basic" onClick={goBasic}>
             <View className="mode-top">
               <Text className="mode-title">基础拆搭</Text>
               <Text className="mode-sub">打好基础，稳扎稳打</Text>

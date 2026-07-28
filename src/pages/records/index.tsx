@@ -160,30 +160,41 @@ export default function RecordsPage() {
             <MatchTrendChart points={stats.trend} height={200} />
           </View>
 
-          {/* 排名：仅展示前三 */}
+          {/* 排名：固定展示冠亚季三个席位 */}
           <View className="section-card">
             <Text className="section-title section-title-alone">我的排名</Text>
-            {stats.ranking.length === 0 ? (
-              <Text className="muted">暂无排名数据</Text>
-            ) : (
-              stats.ranking.slice(0, 3).map((r, i) => {
-                const medal = medalMeta(i)!
+            {[0, 1, 2].map((i) => {
+              const medal = medalMeta(i)!
+              const r = stats.ranking[i]
+              if (!r) {
                 return (
-                  <View key={`${r.name}-${i}`} className={`rank-row ${r.isSelf ? 'self' : ''}`}>
+                  <View key={`empty-${i}`} className="rank-row rank-row-empty">
                     <View className={`rank-medal rank-medal-${medal.rank}`}>
                       <Text className="rank-medal-num">{medal.rank}</Text>
                     </View>
                     <View className="rank-main">
-                      <Text className="rank-name">{r.name}</Text>
+                      <Text className="rank-name rank-name-empty">虚位以待</Text>
                       <Text className={`rank-tag rank-tag-${medal.rank}`}>{medal.label}</Text>
                     </View>
-                    <Text className={`rank-total ${r.total >= 0 ? 'pos' : 'neg'}`}>
-                      {formatDelta(r.total, unit)}
-                    </Text>
+                    <Text className="rank-total muted-total">—</Text>
                   </View>
                 )
-              })
-            )}
+              }
+              return (
+                <View key={`${r.name}-${i}`} className={`rank-row ${r.isSelf ? 'self' : ''}`}>
+                  <View className={`rank-medal rank-medal-${medal.rank}`}>
+                    <Text className="rank-medal-num">{medal.rank}</Text>
+                  </View>
+                  <View className="rank-main">
+                    <Text className="rank-name">{r.name}</Text>
+                    <Text className={`rank-tag rank-tag-${medal.rank}`}>{medal.label}</Text>
+                  </View>
+                  <Text className={`rank-total ${r.total >= 0 ? 'pos' : 'neg'}`}>
+                    {formatDelta(r.total, unit)}
+                  </Text>
+                </View>
+              )
+            })}
           </View>
 
           {/* AI 模块暂时下线
@@ -219,7 +230,7 @@ export default function RecordsPage() {
               className="ai-recommend"
               onClick={() => {
                 const url = stats.ai.recommendUrl
-                if (url.includes('puzzles')) Taro.switchTab({ url })
+                if (url.includes('/pages/puzzles')) Taro.switchTab({ url })
                 else Taro.navigateTo({ url })
               }}
             >

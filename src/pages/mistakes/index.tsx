@@ -74,8 +74,8 @@ export default function MistakesPage() {
       Taro.showToast({ title: '暂无错题可练', icon: 'none' })
       return
     }
-    const ids = buildPracticeIds(filtered).join(',')
-    Taro.navigateTo({ url: `/pages/train/index?ids=${ids}&from=mistakes` })
+    const ids = encodeURIComponent(buildPracticeIds(filtered).join(','))
+    Taro.navigateTo({ url: `/pages/train/index?ids=${ids}&start=0&from=mistakes` })
   }
 
   const chapterLabel =
@@ -254,8 +254,9 @@ export default function MistakesPage() {
                 </Text>
               }
               onClick={() => {
+                const ids = encodeURIComponent(filtered.map((m) => m.puzzleId).join(','))
                 Taro.navigateTo({
-                  url: `/pages/train/index?ids=${item.puzzleId}&from=mistakes`,
+                  url: `/pages/train/index?ids=${ids}&start=${i}&from=mistakes`,
                 })
               }}
             />
