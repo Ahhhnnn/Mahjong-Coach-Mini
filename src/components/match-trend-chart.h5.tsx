@@ -4,9 +4,8 @@ import { useDidShow } from '@tarojs/taro'
 import { init, type EChartsType } from './chart-engine'
 import { trendOption } from './match-trend-option'
 import type { MatchTrend } from '../core/match-stats-service'
-import type { SettleUnit } from '../core/match-types'
 let nextId = 0
-export default function MatchTrendChart({ trend, unit, height = 260 }: { trend: MatchTrend; unit: SettleUnit; height?: number }) {
+export default function MatchTrendChart({ trend, height = 260 }: { trend: MatchTrend; height?: number }) {
   const id = useRef(`h5-match-trend-${++nextId}`)
   const chart = useRef<EChartsType>()
   useDidShow(() => { requestAnimationFrame(() => chart.current?.resize()) })
@@ -19,6 +18,6 @@ export default function MatchTrendChart({ trend, unit, height = 260 }: { trend: 
     window.addEventListener('resize', resize)
     return () => { window.removeEventListener('resize', resize); instance.dispose(); chart.current = undefined }
   }, [])
-  useEffect(() => { chart.current?.setOption(trendOption(trend, unit), { replaceMerge: ['series'] }) }, [trend, unit])
+  useEffect(() => { chart.current?.setOption(trendOption(trend), { replaceMerge: ['series'] }) }, [trend])
   return <View id={id.current} style={{ width: '100%', height: `${height}px` }} />
 }

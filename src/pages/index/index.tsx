@@ -23,8 +23,7 @@ import { loadMistakes } from '../../core/mistake-service'
 import { listFavorites } from '../../core/favorite-service'
 import { listMatches } from '../../core/match-service'
 import { computeMatchStats } from '../../core/match-stats-service'
-import { formatDelta, type SettleUnit } from '../../core/match-types'
-import { getPreferUnit } from '../../core/match-service'
+import { formatDelta } from '../../core/match-types'
 
 import headerBanner from '../../assets/home/header-banner.jpg'
 import coachBanner from '../../assets/home/coach-banner.jpg'
@@ -62,12 +61,11 @@ export default function DashboardPage() {
       setStats(computeTrainStats())
       setMistakeCount(loadMistakes(list).length)
       setFavoriteCount(listFavorites().length)
-      const unit: SettleUnit = getPreferUnit()
-      const ms = computeMatchStats(listMatches(), { range: 'month', unit })
+      const ms = computeMatchStats(listMatches(), { range: 'month' })
       setMatchBrief({
         total: ms.total,
         winRate: ms.winRate,
-        cumText: formatDelta(ms.cumulative, unit),
+        cumText: formatDelta(ms.cumulative),
       })
     }
 

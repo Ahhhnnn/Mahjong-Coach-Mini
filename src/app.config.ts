@@ -31,6 +31,10 @@ export default defineAppConfig({
       root: 'pages/record-edit',
       pages: ['index'],
     },
+    {
+      root: 'pages/mystic',
+      pages: ['index'],
+    },
   ],
   window: {
     backgroundTextStyle: 'light',

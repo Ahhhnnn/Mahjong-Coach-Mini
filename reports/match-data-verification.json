@@ -1,0 +1,15 @@
+{
+  "verifiedAt": "2026-10-16T16:52:26.219Z",
+  "source": "src/content/default-matches.json",
+  "sourceSha256": "be1a61ad30145b8a9b97fdd83e2b9199ca513f4c1e419dad600e76fa225d09b0",
+  "sourceRounds": 21,
+  "cloudRounds": 21,
+  "checkedPlayerScores": 84,
+  "fieldMapping": {
+    "dates": "原 JSON 无时区时间按北京时间转换为时间戳",
+    "emptyNotes": "原 JSON 的 null 备注对应数据库空字符串",
+    "ids": "原始编号对应 board_20261016_<编号>",
+    "systemMetadata": "数据库 _id、_openid 和云端写入时间不属于原 JSON 业务字段"
+  },
+  "differences": []
+}

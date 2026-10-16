@@ -23,8 +23,7 @@ import { listFavorites } from '../../core/favorite-service'
 import { getLevelTitle } from '../../core/train-stats-service'
 import { listMatches } from '../../core/match-service'
 import { computeMatchStats } from '../../core/match-stats-service'
-import { formatDelta, type SettleUnit } from '../../core/match-types'
-import { getPreferUnit } from '../../core/match-service'
+import { formatDelta } from '../../core/match-types'
 import mascotImg from '../../assets/mascot/panda.png'
 
 import './index.scss'
@@ -63,8 +62,7 @@ export default function ProfilePage() {
         const reasonable = records.filter((r: any) => r.reasonable).length
         const practiced = new Set(records.map((r: any) => r.puzzleId).filter(Boolean)).size
         const xp = records.reduce((s: number, r: any) => s + (r.reasonable ? 10 : 3), 0)
-        const unit: SettleUnit = getPreferUnit()
-        const ms = computeMatchStats(listMatches(), { range: 'month', unit })
+        const ms = computeMatchStats(listMatches(), { range: 'month' })
         setStats({
           practiced,
           reasonable,
@@ -76,7 +74,7 @@ export default function ProfilePage() {
           favoriteCount: listFavorites().length,
           matchTotal: ms.total,
           matchWinRate: ms.winRate,
-          matchCumText: formatDelta(ms.cumulative, unit),
+          matchCumText: formatDelta(ms.cumulative),
         })
       } catch { /* ignore */ }
     }

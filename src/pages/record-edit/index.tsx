@@ -14,20 +14,19 @@ import {
 import {
   getMatch,
   listRecentLocations,
-  listRecentPlayerNames,
   removeMatch,
   upsertMatch,
-  getPreferUnit,
 } from '../../core/match-service'
 import {
   PERFORMANCE_OPTIONS,
+  FIXED_MATCH_PLAYERS,
   PLAYER_AVATAR_COLORS,
   REASON_OPTIONS,
   VARIANT_LABELS,
+  SELF_PLAYER_NAME,
   type MatchPerformance,
   type MatchReason,
   type MatchVariant,
-  type SettleUnit,
 } from '../../core/match-types'
 
 import './index.scss'
@@ -82,12 +81,7 @@ function formatDisplayTime(ts: number) {
 }
 
 function emptyPlayers(): PlayerDraft[] {
-  return [
-    { name: '我的', isSelf: true, delta: '' },
-    { name: '', isSelf: false, delta: '' },
-    { name: '', isSelf: false, delta: '' },
-    { name: '', isSelf: false, delta: '' },
-  ]
+  return FIXED_MATCH_PLAYERS.map((name) => ({ name, isSelf: name === SELF_PLAYER_NAME, delta: '' }))
 }
 
 const LAST_PLAYER_INDEX = 3
@@ -129,14 +123,12 @@ export default function RecordEditPage() {
   const [playedAt, setPlayedAt] = useState(Date.now())
   const [variant] = useState<MatchVariant>('xuezhan')
   const [location, setLocation] = useState('家庭局')
-  const [settleUnit, setSettleUnit] = useState<SettleUnit>(getPreferUnit())
   const [players, setPlayers] = useState<PlayerDraft[]>(emptyPlayers)
   const [performance, setPerformance] = useState<MatchPerformance | undefined>('good')
   const [reasons, setReasons] = useState<MatchReason[]>([])
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const recentNames = useMemo(() => listRecentPlayerNames(), [])
   const recentLocations = useMemo(() => listRecentLocations(), [])
 
   const multiValue = useMemo(() => {
@@ -158,26 +150,21 @@ export default function RecordEditPage() {
     setPlayedAt(record.playedAt)
     setNote(record.note || '')
     setLocation(record.location || '')
-    setSettleUnit(record.settleUnit)
     setPerformance(record.performance)
     setReasons(record.reasons || [])
     const drafts: PlayerDraft[] = record.players.slice(0, 4).map((p) => {
-      const v = settleUnitField(p, record.settleUnit)
+      const v = p.scoreDelta
       return {
-        name: p.isSelf ? p.name || '我的' : p.name,
+        name: p.name,
         isSelf: p.isSelf,
         delta: v === undefined || v === null ? '' : String(v),
       }
     })
-    while (drafts.length < 4) {
-      drafts.push({ name: '', isSelf: false, delta: '' })
-    }
-    if (!drafts.some((p) => p.isSelf)) drafts[0].isSelf = true
     setPlayers(withAutoLastDelta(drafts))
     Taro.setNavigationBarTitle({ title: '编辑牌局' })
   })
 
-  const unitLabel = settleUnit === 'score' ? '分' : '元'
+  const unitLabel = '分'
   const scoreSumPreview = useMemo(() => {
     const vals = players.map((p) => parseDeltaInput(p.delta))
     const nums = vals.filter((v): v is number => v !== null)
@@ -230,14 +217,10 @@ export default function RecordEditPage() {
 
     const parsed = players.map((p, i) => {
       const num = nums[i]
-      let name = p.name.trim()
-      if (p.isSelf) name = name || '我'
-      else if (!name || name === '玩家') name = `玩家${i + 1}`
       return {
-        name,
+        name: p.name,
         isSelf: p.isSelf,
-        scoreDelta: settleUnit === 'score' ? num : undefined,
-        moneyDelta: settleUnit === 'money' ? num : undefined,
+        scoreDelta: num,
       }
     })
 
@@ -253,7 +236,7 @@ export default function RecordEditPage() {
         playedAt,
         variant,
         location,
-        settleUnit,
+        settleUnit: 'score',
         players: parsed,
         performance,
         reasons,
@@ -323,20 +306,7 @@ export default function RecordEditPage() {
             ))}
           </View>
         )}
-        <View className="unit-switch">
-          <Text
-            className={`unit-btn ${settleUnit === 'score' ? 'active' : ''}`}
-            onClick={() => setSettleUnit('score')}
-          >
-            记分
-          </Text>
-          <Text
-            className={`unit-btn ${settleUnit === 'money' ? 'active' : ''}`}
-            onClick={() => setSettleUnit('money')}
-          >
-            记金额
-          </Text>
-        </View>
+
       </View>
 
       <View className="section-card">
@@ -359,16 +329,7 @@ export default function RecordEditPage() {
               </View>
               <View className="player-main">
                 <View className="player-name-row">
-                  {p.isSelf ? (
-                    <Text className="player-name">我的</Text>
-                  ) : (
-                    <Input
-                      className="player-name-input"
-                      value={p.name}
-                      placeholder={`玩家${i}`}
-                      onInput={(e) => updatePlayer(i, { name: e.detail.value })}
-                    />
-                  )}
+                  <Text className="player-name">{p.name}{p.isSelf ? '（我）' : ''}</Text>
                   {isAuto && <Text className="auto-badge">自动</Text>}
                 </View>
               </View>
@@ -388,24 +349,6 @@ export default function RecordEditPage() {
             </View>
           )
         })}
-        {recentNames.length > 0 && (
-          <View className="chip-row">
-            <Text className="chip-hint">常用：</Text>
-            {recentNames.slice(0, 6).map((n) => (
-              <Text
-                key={n}
-                className="chip"
-                onClick={() => {
-                  const idx = players.findIndex((p) => !p.isSelf && !p.name.trim())
-                  if (idx >= 0) updatePlayer(idx, { name: n })
-                  else Taro.showToast({ title: '请先清空一个玩家名', icon: 'none' })
-                }}
-              >
-                {n}
-              </Text>
-            ))}
-          </View>
-        )}
         <Text className="hint-text">
           前三家录入后，第四家自动平衡；四人合计须为 0
           {scoreSumPreview === null
@@ -471,11 +414,4 @@ export default function RecordEditPage() {
       )}
     </View>
   )
-}
-
-function settleUnitField(
-  p: { scoreDelta?: number; moneyDelta?: number },
-  unit: SettleUnit
-): number | undefined {
-  return unit === 'score' ? p.scoreDelta : p.moneyDelta
 }

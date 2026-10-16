@@ -1,23 +1,56 @@
 import {
+  compareMatchesByTime,
+  fixedMatchRecords,
   getPlayerDelta,
   getSelfDelta,
   getSelfPlayer,
   type MatchPerformance,
   type MatchReason,
   type MatchRecord,
-  type SettleUnit,
 } from './match-types'
 import { REASON_OPTIONS } from './match-types'
 
 export type StatsRange = 'all' | 'week' | 'month' | 'quarter' | 'year'
 export type TrendSpan = 'all' | 'week' | 'month' | 'quarter' | 'half' | 'year'
+export type MatchSeasonPeriod = 'all' | 'Q1' | 'Q2' | 'Q3' | 'Q4'
+export type MatchSeason = { year: number; period: MatchSeasonPeriod }
+
+export const MATCH_SEASON_OPTIONS: { value: MatchSeasonPeriod; label: string; dates: string }[] = [
+  { value: 'all', label: '全年', dates: '01.01 — 12.31' },
+  { value: 'Q1', label: 'Q1', dates: '01.01 — 03.31' },
+  { value: 'Q2', label: 'Q2', dates: '04.01 — 06.30' },
+  { value: 'Q3', label: 'Q3', dates: '07.01 — 09.30' },
+  { value: 'Q4', label: 'Q4', dates: '10.01 — 12.31' },
+]
+const BEIJING_OFFSET = 8 * 60 * 60 * 1000
+
+/** 与导入牌局保持一致，按北京时间的自然年、自然季度划分。 */
+export function getMatchSeasonAt(time = Date.now()): MatchSeason {
+  const date = new Date(time + BEIJING_OFFSET)
+  const period = `Q${Math.floor(date.getUTCMonth() / 3) + 1}` as MatchSeasonPeriod
+  return { year: date.getUTCFullYear(), period }
+}
+
+export function matchSeasonBounds(season: MatchSeason): { start: number; end: number } {
+  const month = season.period === 'all' ? 0 : (Number(season.period.slice(1)) - 1) * 3
+  const months = season.period === 'all' ? 12 : 3
+  return {
+    start: Date.UTC(season.year, month, 1) - BEIJING_OFFSET,
+    end: Date.UTC(season.year, month + months, 1) - BEIJING_OFFSET,
+  }
+}
+
+export function filterBySeason(records: MatchRecord[], season: MatchSeason): MatchRecord[] {
+  const { start, end } = matchSeasonBounds(season)
+  return records.filter((record) => record.playedAt >= start && record.playedAt < end)
+}
 
 export type TrendPoint = { label: string; time: number }
 export type TrendSeries = { id: string; name: string; color: string; values: number[]; total: number }
 export type MatchTrend = { points: TrendPoint[]; series: TrendSeries[] }
 const MEMBER_COLORS = ['#56c9a0', '#78b8ef', '#ba9af4', '#ef998f', '#82cbbf']
-function memberKey(player: { name: string; isSelf: boolean }, seat: number): string {
-  return player.isSelf ? '__self__' : player.name?.trim() && player.name !== '玩家' ? player.name.trim() : `__seat_${seat}`
+function memberKey(player: { name: string; isSelf: boolean }): string {
+  return player.isSelf ? '__self__' : player.name
 }
 function memberColor(key: string): string {
   const known: Record<string, string> = { __self__: '#edc779', WUYU: '#56c9a0', TANGXIANG: '#78b8ef', DUHAN: '#ba9af4' }
@@ -45,7 +78,6 @@ export type AiInsight = {
 }
 
 export type MatchStats = {
-  unit: SettleUnit
   total: number
   wins: number
   losses: number
@@ -110,20 +142,20 @@ export function filterByRange(records: MatchRecord[], range: StatsRange): MatchR
   return records.filter((r) => r.playedAt >= start)
 }
 
-export function buildTrend(records: MatchRecord[], span: TrendSpan, unit: SettleUnit): MatchTrend {
+export function buildTrend(records: MatchRecord[], span: TrendSpan): MatchTrend {
   const start = trendSpanStart(span)
-  const sorted = records.filter((r) => r.settleUnit === unit && r.playedAt >= start)
-    .slice().sort((a, b) => a.playedAt - b.playedAt || a.id.localeCompare(b.id))
+  const sorted = fixedMatchRecords(records).filter((r) => r.settleUnit === 'score' && r.playedAt >= start)
+    .slice().sort(compareMatchesByTime)
   if (!sorted.length) return { points: [], series: [] }
   const members = new Map<string, TrendSeries>()
-  for (const record of sorted) record.players.forEach((player, seat) => {
-    const id = memberKey(player, seat)
-    if (!members.has(id)) members.set(id, { id, name: player.isSelf ? '我' : player.name || `玩家${seat + 1}`, color: memberColor(id), values: [0], total: 0 })
+  for (const record of sorted) record.players.forEach((player) => {
+    const id = memberKey(player)
+    if (!members.has(id)) members.set(id, { id, name: player.name, color: memberColor(id), values: [0], total: 0 })
   })
   const firstTime = span === 'all' ? sorted[0].playedAt - 1 : start
   const points: TrendPoint[] = [{ label: '起点', time: firstTime }]
   for (const record of sorted) {
-    const deltas = new Map(record.players.map((p, seat) => [memberKey(p, seat), getPlayerDelta(p, unit)]))
+    const deltas = new Map(record.players.map((p) => [memberKey(p), getPlayerDelta(p)]))
     members.forEach((series, id) => {
       series.total += deltas.get(id) || 0
       series.values.push(series.total)
@@ -134,20 +166,16 @@ export function buildTrend(records: MatchRecord[], span: TrendSpan, unit: Settle
   return { points, series: Array.from(members.values()).sort((a, b) => Number(b.id === '__self__') - Number(a.id === '__self__') || a.id.localeCompare(b.id)) }
 }
 
-export function buildRanking(records: MatchRecord[], unit: SettleUnit): RankEntry[] {
+export function buildRanking(records: MatchRecord[]): RankEntry[] {
   const map = new Map<string, RankEntry>()
 
-  for (const r of records) {
-    r.players.forEach((p, seatIndex) => {
-      const rawName = (p.name || '').trim()
-      // 历史数据里多名未命名对手都叫「玩家」，按座位拆开，避免榜上只剩两人
-      const isAnon = !rawName || rawName === '玩家'
-      const key = p.isSelf ? '__self__' : isAnon ? `__seat_${seatIndex}` : rawName
-      if (!key) return
+  for (const r of fixedMatchRecords(records).filter((record) => record.settleUnit === 'score')) {
+    r.players.forEach((p) => {
+      const key = memberKey(p)
 
-      const delta = getPlayerDelta(p, unit)
+      const delta = getPlayerDelta(p)
 
-      const displayName = p.isSelf ? '我' : isAnon ? `玩家${seatIndex + 1}` : rawName
+      const displayName = p.name
       const exist = map.get(key)
       if (exist) {
         exist.total += delta
@@ -175,7 +203,7 @@ function reasonLabel(r: MatchReason): string {
 }
 
 export function buildAiInsight(records: MatchRecord[]): AiInsight {
-  const recent = records.slice(0, 20)
+  const recent = fixedMatchRecords(records).sort((a, b) => compareMatchesByTime(b, a)).slice(0, 20)
   const reasonCount = new Map<MatchReason, number>()
   let aggressive = 0
   let defense = 0
@@ -262,14 +290,13 @@ export function computeMatchStats(
   options: {
     range?: StatsRange
     trendSpan?: TrendSpan
-    unit?: SettleUnit
+    season?: MatchSeason
   } = {}
 ): MatchStats {
   const range = options.range || 'all'
   const trendSpan = options.trendSpan || 'all'
-  const unit = options.unit || 'score'
-  const unitRecords = records.filter((r) => r.settleUnit === unit)
-  const filtered = filterByRange(unitRecords, range)
+  const scoreRecords = fixedMatchRecords(records)
+  const filtered = options.season ? filterBySeason(scoreRecords, options.season) : filterByRange(scoreRecords, range)
 
   let wins = 0
   let losses = 0
@@ -288,25 +315,24 @@ export function computeMatchStats(
   const winRate = decisive > 0 ? Math.round((wins / decisive) * 100) : 0
 
   return {
-    unit,
     total: filtered.length,
     wins,
     losses,
     draws,
     winRate,
     cumulative,
-    trend: buildTrend(records, trendSpan, unit),
-    ranking: buildRanking(filtered, unit),
-    ai: buildAiInsight(records),
+    // 历史赛季从零累计，不能再套用相对于今天的滚动时间窗口。
+    trend: buildTrend(options.season ? filtered : records, options.season ? 'all' : trendSpan),
+    ranking: buildRanking(filtered),
+    ai: buildAiInsight(options.season ? filtered : records),
   }
 }
 
 /** 供录入页软校验：四人 delta 之和 */
 export function sumPlayerDeltas(
-  players: { scoreDelta?: number; moneyDelta?: number }[],
-  unit: SettleUnit
+  players: { scoreDelta?: number }[]
 ): number {
-  return players.reduce((s, p) => s + getPlayerDelta(p as any, unit), 0)
+  return players.reduce((s, p) => s + getPlayerDelta(p), 0)
 }
 
 export function performanceToLabel(p?: MatchPerformance): string {

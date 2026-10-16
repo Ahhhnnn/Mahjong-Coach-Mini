@@ -1,9 +1,8 @@
 import { graphic, type EChartsCoreOption } from './chart-engine'
 import type { MatchTrend } from '../core/match-stats-service'
-import type { SettleUnit } from '../core/match-types'
 
-export function trendOption(trend: MatchTrend, unit: SettleUnit): EChartsCoreOption {
-  const suffix = unit === 'score' ? '分' : '元'
+export function trendOption(trend: MatchTrend): EChartsCoreOption {
+  const suffix = '分'
   return {
     backgroundColor: 'transparent',
     animationDuration: 900,

@@ -25,6 +25,9 @@
 }
 
 .range-pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   background: #fff;
   border-radius: 999px;
   padding: 10px 20px;
@@ -45,6 +48,62 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 56px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.season-selector {
+  padding: 0 16px 18px;
+  margin-bottom: 24px;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.season-tabs {
+  --tabs-wrap-height: 88px;
+  --tabs-nav-background-color: transparent;
+  --tabs-line-width: 36px;
+  --tabs-line-height: 5px;
+  --tabs-line-background-color: #1a5c2e;
+  --tab-font-size: 28px;
+  --tab-color: #8b998e;
+  --tab-active-color: #1a5c2e;
+}
+
+.season-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 12px 0;
+  margin-top: 4px;
+  border-top: 1px solid #eef2ed;
+}
+
+.season-dates {
+  font-size: 22px;
+  letter-spacing: 1px;
+  color: #8b998e;
+}
+
+.season-status {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a5c2e;
+  background: #eef5ee;
+  padding: 4px 14px;
+  border-radius: 999px;
+}
+
+.hero-season {
+  display: block;
+  margin-bottom: 18px;
+  color: #d8c493;
+  font-size: 28px;
+  font-weight: 600;
 }
 
 .hero-card {
@@ -57,14 +116,7 @@
   overflow: hidden;
 }
 
-.hero-unit {
-  margin-bottom: 8px;
-}
 
-.hero-unit-text {
-  font-size: 22px;
-  color: rgba(255, 255, 255, 0.75);
-}
 
 .hero-cum-label {
   display: block;
@@ -538,16 +590,10 @@
 .records-eyebrow { display: block; font-size: 17px; letter-spacing: 4px; color: #bfa979; margin-bottom: 18px; }
 .hero-card { background: linear-gradient(135deg, #164a34, #0b2f22); border: 1px solid rgba(214,181,114,.3); box-shadow: 0 12px 32px rgba(13,48,31,.16); }
 .hero-cum-value { color: #f2d595; font-size: 68px; letter-spacing: -2px; animation: records-value-enter .65s ease-out both; }
-.hero-unit { position: absolute; right: 24px; top: 28px; }
-.hero-unit-text { font-size: 20px; }
 .trend-card { background: linear-gradient(145deg, #123e2e, #0b271e); border: 1px solid rgba(220,188,119,.24); border-radius: 28px; padding: 28px 20px; margin-bottom: 24px; box-shadow: 0 12px 30px rgba(12,49,32,.13); }
 .trend-heading { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 24px; }
 .trend-title { color: #f3e7cd; font-size: 34px; font-weight: 700; }
 .trend-subtitle { color: #9eb6a8; font-size: 21px; }
-.trend-tabs { display: flex; background: rgba(0,0,0,.16); border-radius: 16px; padding: 6px; margin-bottom: 26px; }
-.trend-tab { flex: 1; text-align: center; font-size: 21px; padding: 12px 0; border-radius: 12px; color: #9ab1a3; transition: color .25s, background .25s;
-  &.active { color: #183d2c; background: linear-gradient(120deg, #d6b777, #f0d99f); font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,.13); }
-}
 .trend-no-data { height: 360px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #c4d3c9; font-size: 24px; }
 .trend-hint { display: block; text-align: center; color: #829e8e; font-size: 19px; margin-top: 18px; }
 .trend-totals { border-top: 1px solid rgba(204,216,187,.12); padding-top: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 22px; }

@@ -1,5 +1,5 @@
 import Taro from '@tarojs/taro'
-import { getPlayerDelta, getSelfPlayer, type MatchRecord } from './match-types'
+import { fixedMatchRecords, getPlayerDelta, getSelfPlayer, type MatchRecord } from './match-types'
 
 export type BadgeRarity = 'copper' | 'silver' | 'gold' | 'legend'
 type Metric = 'first' | 'games' | 'best' | 'winStreak' | 'rate' | 'stable' | 'second' | 'worst' | 'loseStreak' | 'volatile'
@@ -46,44 +46,69 @@ function readState(): BadgeState {
   } catch { /* 本地降级 */ }
   return { unlocked: {}, seen: [] }
 }
+function needsMinimumGames(badge: MatchBadge): boolean {
+  return ['rate', 'stable', 'volatile'].includes(badge.metric)
+}
+function meetsTarget(badge: MatchBadge, values: Record<Metric, number>): boolean {
+  return values.games > 0 && (!needsMinimumGames(badge) || values.games >= 10)
+    && (badge.metric === 'stable' ? values.stable <= badge.target : values[badge.metric] >= badge.target)
+}
 function evaluate(records: MatchRecord[]) {
-  const games = records.filter((r) => r.settleUnit === 'score' && getSelfPlayer(r))
+  const games = fixedMatchRecords(records).filter((r) => Number.isFinite(r.playedAt)
+    && r.players.every((player) => Number.isFinite(player.scoreDelta))
+    && Math.abs(r.players.reduce((sum, player) => sum + player.scoreDelta!, 0)) < 1e-6)
     .slice().sort((a, b) => a.playedAt - b.playedAt || a.id.localeCompare(b.id))
-  const scores: number[] = []
+  const firstUnlockedAt: Record<string, number> = {}
+  const values: Record<Metric, number> = {
+    first: 0, games: 0, best: 0, worst: 0, winStreak: 0, loseStreak: 0,
+    second: 0, rate: 0, stable: 0, volatile: 0,
+  }
+  let positiveCount = 0, mean = 0, squaredDeviations = 0
   let winStreak = 0, loseStreak = 0, maxWin = 0, maxLose = 0, seconds = 0, firstRank = 0
   games.forEach((r, i) => {
-    const delta = getPlayerDelta(getSelfPlayer(r)!, 'score')
-    const rank = 1 + r.players.filter((p) => getPlayerDelta(p, 'score') > delta).length
-    const bottom = r.players.every((p) => getPlayerDelta(p, 'score') >= delta)
-    if (i === 0) firstRank = rank
+    const delta = getPlayerDelta(getSelfPlayer(r)!)
+    const rank = 1 + r.players.filter((p) => getPlayerDelta(p) > delta).length
+    const first = rank === 1 && r.players.some((p) => getPlayerDelta(p) < delta)
+    const bottom = r.players.every((p) => getPlayerDelta(p) >= delta) && r.players.some((p) => getPlayerDelta(p) > delta)
+    if (i === 0) firstRank = first ? 1 : rank === 1 ? 0 : rank
     if (rank === 2) seconds++
-    winStreak = rank === 1 ? winStreak + 1 : 0
+    winStreak = first ? winStreak + 1 : 0
     loseStreak = bottom ? loseStreak + 1 : 0
     maxWin = Math.max(maxWin, winStreak)
     maxLose = Math.max(maxLose, loseStreak)
-    scores.push(delta)
+    const n = i + 1
+    if (delta > 0) positiveCount++
+    const difference = delta - mean
+    mean += difference / n
+    squaredDeviations += difference * (delta - mean)
+    const stddev = Math.sqrt(Math.max(0, squaredDeviations / n))
+    Object.assign(values, {
+      first: firstRank === 1 ? 1 : 0, games: n,
+      best: Math.max(values.best, delta), worst: Math.max(values.worst, -delta),
+      winStreak: maxWin, loseStreak: maxLose, second: seconds,
+      rate: positiveCount / n * 100, stable: stddev, volatile: stddev,
+    })
+    // 逐场回放历史，解锁时间取首次达标的牌局时间，补录或编辑后也会重新推算。
+    for (const badge of MATCH_BADGES) {
+      if (firstUnlockedAt[badge.id] === undefined && meetsTarget(badge, values)) {
+        firstUnlockedAt[badge.id] = r.playedAt
+      }
+    }
   })
-  const n = scores.length
-  const mean = n ? scores.reduce((sum, v) => sum + v, 0) / n : 0
-  const stddev = n ? Math.sqrt(scores.reduce((sum, v) => sum + (v - mean) ** 2, 0) / n) : 0
-  const values: Record<Metric, number> = {
-    first: firstRank === 1 ? 1 : 0, games: n, best: Math.max(0, ...scores),
-    worst: Math.max(0, ...scores.map((s) => -s)), winStreak: maxWin, loseStreak: maxLose,
-    second: seconds, rate: n ? scores.filter((s) => s > 0).length / n * 100 : 0,
-    stable: stddev, volatile: stddev,
-  }
+  const n = values.games
   return MATCH_BADGES.map((badge) => {
     const current = values[badge.metric]
-    const minimum = ['rate', 'stable', 'volatile'].includes(badge.metric)
+    const minimum = needsMinimumGames(badge)
     const enough = !minimum || n >= 10
-    const hit = n > 0 && enough && (badge.metric === 'stable' ? current <= badge.target : current >= badge.target)
+    const hit = meetsTarget(badge, values)
     const progress = minimum && !enough ? n / 10 * 100 : badge.metric === 'stable' ? (hit ? 100 : 0) : current / badge.target * 100
     let progressLabel = `${Number(current.toFixed(1))} / ${badge.target}`
     if (minimum && !enough) progressLabel = `${n} / 10 场 · 尚需积累样本`
     else if (badge.metric === 'rate') progressLabel = `正分率 ${current.toFixed(1)}% / 60%`
     else if (badge.metric === 'stable' || badge.metric === 'volatile') progressLabel = `标准差 ${current.toFixed(1)} / ${badge.metric === 'stable' ? '≤' : '≥'} ${badge.target}`
     else if (badge.metric === 'first') progressLabel = n ? (hit ? '首场第一名' : '首场未获第一名') : '记录第一场牌局'
-    return { ...badge, current, progress: Math.min(100, Math.max(0, progress)), progressLabel, hit }
+    return { ...badge, current, progress: Math.min(100, Math.max(0, progress)), progressLabel,
+      unlockedAt: hit ? firstUnlockedAt[badge.id] : undefined }
   })
 }
 
@@ -91,12 +116,16 @@ function evaluate(records: MatchRecord[]) {
 export function updateMatchBadges(records: MatchRecord[], markSeen = false): MatchBadgeView[] {
   const state = readState()
   const evaluated = evaluate(records)
+  const unlocked: Record<string, number> = {}
   for (const badge of evaluated) {
-    if (badge.hit && !state.unlocked[badge.id]) state.unlocked[badge.id] = Date.now()
+    if (badge.unlockedAt !== undefined) unlocked[badge.id] = badge.unlockedAt
   }
+  // 资格以当前有效历史为准，修复旧匿名牌局或旧算法留下的误授缓存。
+  state.unlocked = unlocked
+  state.seen = state.seen.filter((id) => unlocked[id] !== undefined)
   if (markSeen) state.seen = Object.keys(state.unlocked)
   try { Taro.setStorageSync(KEY, state) } catch { /* 不阻塞牌局保存 */ }
-  return evaluated.map(({ hit: _hit, ...badge }) => ({ ...badge, unlockedAt: state.unlocked[badge.id] }))
+  return evaluated
 }
 export function getPendingBadgeIds(): string[] {
   const state = readState()

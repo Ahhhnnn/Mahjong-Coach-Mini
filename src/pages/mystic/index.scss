@@ -1,0 +1,63 @@
+.mystic-page {
+  min-height: 100vh;
+  padding: 28px 28px 48px;
+  box-sizing: border-box;
+  background: #f5f0e5;
+  color: #263d30;
+}
+.mystic-book-header { position: relative; padding: 8px 4px 26px; }
+.mystic-book-meta { display: flex; justify-content: space-between; gap: 12px; font-size: 20px; letter-spacing: 2px; color: #877e6e; }
+.mystic-book-title-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 42px 0 32px; }
+.mystic-book-title { display: block; font-family: 'Songti SC', 'STSong', serif; font-size: 64px; font-weight: 700; letter-spacing: 10px; line-height: 1.25; }
+.mystic-book-subtitle { display: block; margin-top: 14px; font-size: 25px; color: #7a7567; letter-spacing: 3px; }
+.mystic-book-stamp { display: flex; flex-shrink: 0; flex-direction: column; align-items: center; justify-content: center; width: 92px; height: 92px; border: 3px double #ad5544; border-radius: 5px; transform: rotate(6deg); color: #a34535; font-family: 'Songti SC', 'STSong', serif; font-size: 30px; letter-spacing: 4px; line-height: 1.2; }
+.mystic-period { display: flex; justify-content: space-between; align-items: center; padding: 22px 24px; background: #eae5d8; border-radius: 8px; gap: 16px; color: #1a5c2e; }
+.mystic-period-label { font-size: 26px; font-weight: 600; }
+.mystic-period-count { font-size: 21px; color: #777467; margin-left: 20px; }
+.mystic-tabs { --tabs-nav-background-color: transparent; --tabs-line-background-color: #1a5c2e; --tabs-line-width: 48px; --tabs-wrap-height: 94px; --tab-font-size: 29px; --tab-color: #857c6b; --tab-active-color: #1a5c2e; border-bottom: 1px solid #d9d1bf; }
+.mystic-chapter { padding-top: 34px; }
+.mystic-chapter-heading { display: flex; align-items: center; gap: 18px; margin-bottom: 28px; }
+.mystic-chapter-number { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 66px; height: 66px; border: 1px solid #c7bda6; border-radius: 50%; font-family: 'Songti SC', 'STSong', serif; font-size: 36px; color: #7e765e; }
+.mystic-chapter-title { display: block; font-family: 'Songti SC', 'STSong', serif; font-size: 31px; font-weight: 700; line-height: 1.4; }
+.mystic-body-note { display: block; font-size: 22px; color: #7b7468; line-height: 1.7; }
+.mystic-verdict { padding: 30px 26px; border-radius: 8px; border: 1px solid #d8c8b3; background: #eee5d7; }
+.mystic-verdict-label { display: block; font-size: 22px; letter-spacing: 3px; color: #925a48; }
+.mystic-verdict-name { display: block; margin-top: 16px; font-family: 'Songti SC', 'STSong', serif; font-size: 41px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.mystic-verdict-note { display: block; margin-top: 12px; font-size: 22px; line-height: 1.7; color: #7b6655; }
+.mystic-verdict.lucky { background: #e4eadd; border-color: #c5d1bb; .mystic-verdict-label { color: #416148; } .mystic-verdict-note { color: #596b52; } }
+.mystic-list-heading { display: block; margin: 36px 0 18px; font-size: 22px; color: #837967; letter-spacing: 2px; }
+.mystic-person, .mystic-place { padding: 28px 24px; margin-bottom: 18px; border: 1px solid #e0d8c8; border-radius: 10px; background: #fcf9f1; }
+.mystic-entry-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.mystic-person-identity { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.mystic-person-index { font-family: Georgia, serif; font-size: 28px; color: #b1a78f; }
+.mystic-entry-name { font-size: 29px; font-weight: 650; overflow-wrap: anywhere; min-width: 0; }
+.mystic-entry-tag-row { display: flex; align-items: center; gap: 12px; color: #938a77; flex-shrink: 0; }
+.mystic-tag { font-size: 20px; color: #807562; background: #eee8da; padding: 5px 12px; border-radius: 4px; white-space: nowrap; &.red { color: #9f4f3d; background: #f0e1d8; } &.green { color: #366346; background: #e3ecde; } }
+.mystic-pressure { display: flex; align-items: baseline; gap: 18px; margin-top: 20px; }
+.mystic-pressure-value { font-family: Georgia, serif; font-size: 50px; font-weight: 700; color: #9b5542; }
+.mystic-pressure-bar { height: 7px; border-radius: 4px; background: #e9e2d6; margin: 16px 0 22px; overflow: hidden; }
+.mystic-pressure-fill { height: 100%; border-radius: 4px; background: #a76c58; }
+.mystic-person-counts { display: flex; justify-content: space-between; gap: 10px; font-size: 22px; color: #807665; }
+.mystic-count { font-weight: 700; color: #374c3b; }
+.mystic-entry-foot { display: flex; justify-content: space-between; gap: 12px; border-top: 1px dashed #e0d8c8; margin-top: 24px; padding-top: 18px; font-size: 21px; color: #7b7468; }
+.mystic-place-verdicts { display: flex; gap: 16px; align-items: stretch; .mystic-verdict { flex: 1; min-width: 0; padding: 24px 20px; } .mystic-verdict-name { font-size: 34px; } }
+.mystic-place-metrics { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 22px; }
+.mystic-place-average { font-family: Georgia, serif; font-weight: 700; font-size: 39px; &.positive { color: #1a5c2e; } &.negative { color: #9b5542; } }
+.mystic-place-secondary { display: flex; flex-direction: column; gap: 10px; font-size: 22px; color: #7b7468; text-align: right; }
+.mystic-sample-note { display: block; margin: 24px 4px; font-size: 21px; line-height: 1.8; color: #817966; }
+.mystic-colophon { text-align: center; color: #81765f; font-size: 23px; letter-spacing: 3px; margin-top: 42px; }
+.mystic-colophon-rule { width: 44px; height: 2px; background: #b5a588; margin: 0 auto 22px; }
+.mystic-method { display: block; margin-top: 18px; font-size: 20px; line-height: 1.9; letter-spacing: 0; color: #938976; }
+.mystic-empty { text-align: center; padding: 68px 20px 28px; .taroify-button { margin-top: 30px; } }
+.mystic-empty-mark { display: inline-block; font-family: 'Songti SC', 'STSong', serif; font-size: 38px; color: #a58d65; border: 1px solid #cbbc9f; padding: 16px; margin-bottom: 30px; }
+.mystic-empty-title { display: block; font-family: 'Songti SC', 'STSong', serif; font-size: 32px; margin-bottom: 16px; }
+.mystic-place-empty { padding: 30px 24px; border: 1px dashed #d3c7af; border-radius: 8px; }
+.mystic-evidence-popup { background: #fcf9f1; color: #263d30; padding-bottom: env(safe-area-inset-bottom); }
+.mystic-evidence-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 30px 28px 22px; border-bottom: 1px solid #e3dbcb; }
+.mystic-close { flex-shrink: 0; min-width: 60px; width: 60px; height: 60px; padding: 0; color: #7b7468; }
+.mystic-evidence-scroll { height: 58vh; box-sizing: border-box; }
+.mystic-evidence-row { padding: 24px 28px; border-bottom: 1px solid #eae3d5; }
+.mystic-evidence-date { display: block; font-family: Georgia, serif; font-size: 27px; color: #3e5140; margin-bottom: 8px; }
+.mystic-evidence-location { font-size: 22px; color: #7b7468; }
+.mystic-evidence-scores { display: flex; flex-wrap: wrap; gap: 12px 28px; font-size: 24px; margin-top: 14px; color: #665b48; }
+.mystic-evidence-hint { display: block; text-align: center; font-size: 21px; color: #8f856f; padding: 28px; }

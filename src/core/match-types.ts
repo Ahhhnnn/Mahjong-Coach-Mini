@@ -1,6 +1,3 @@
-/** 结算单位：积分 / 金额 */
-export type SettleUnit = 'score' | 'money'
-
 /** 本人本场胜负 */
 export type MatchResult = 'win' | 'loss' | 'draw'
 
@@ -24,7 +21,26 @@ export interface MatchPlayer {
   isSelf: boolean
   isDealer?: boolean
   scoreDelta?: number
+  /** 仅识别旧存档，不再录入或展示。 */
   moneyDelta?: number
+}
+
+export const SELF_PLAYER_NAME = 'HENING'
+export const FIXED_MATCH_PLAYERS = [SELF_PLAYER_NAME, 'WUYU', 'TANGXIANG', 'DUHAN'] as const
+
+/** 只接纳能确认身份的完整四人牌局；匿名座位不能推断成某位牌友。 */
+export function normalizeMatchPlayers(players: MatchPlayer[]): MatchPlayer[] | undefined {
+  if (players.length !== FIXED_MATCH_PLAYERS.length) return undefined
+  const byName = new Map<string, MatchPlayer>()
+  for (const player of players) {
+    const rawName = (player.name || '').trim()
+    const name = player.isSelf && ['', '我', '我的'].includes(rawName)
+      ? SELF_PLAYER_NAME : rawName.toUpperCase()
+    if (!FIXED_MATCH_PLAYERS.some((known) => known === name)
+      || byName.has(name) || (player.isSelf && name !== SELF_PLAYER_NAME)) return undefined
+    byName.set(name, { ...player, name, isSelf: name === SELF_PLAYER_NAME })
+  }
+  return FIXED_MATCH_PLAYERS.map((name) => byName.get(name)!)
 }
 
 export interface MatchRecord {
@@ -32,7 +48,8 @@ export interface MatchRecord {
   playedAt: number
   variant: MatchVariant
   location?: string
-  settleUnit: SettleUnit
+  /** money 仅用于识别并排除旧存档。 */
+  settleUnit: 'score' | 'money'
   result: MatchResult
   players: MatchPlayer[]
   performance?: MatchPerformance
@@ -40,6 +57,20 @@ export interface MatchRecord {
   note?: string
   createdAt: number
   updatedAt: number
+}
+
+/** 统一按对局发生时间从早到晚排序，同一时刻按稳定 ID 排序。 */
+export function compareMatchesByTime(a: MatchRecord, b: MatchRecord): number {
+  return a.playedAt - b.playedAt || a.id.localeCompare(b.id)
+}
+
+/** 保留原始存储，展示和统计仅使用固定四人的完整记录。 */
+export function fixedMatchRecords(records: MatchRecord[]): MatchRecord[] {
+  return records.flatMap((record) => {
+    if (record.settleUnit !== 'score') return []
+    const players = normalizeMatchPlayers(record.players)
+    return players ? [{ ...record, players }] : []
+  })
 }
 
 export const PERFORMANCE_OPTIONS: {
@@ -81,9 +112,9 @@ export function deriveMatchResult(delta: number): MatchResult {
   return 'draw'
 }
 
-export function getPlayerDelta(player: MatchPlayer, unit: SettleUnit): number {
-  const v = unit === 'score' ? player.scoreDelta : player.moneyDelta
-  return typeof v === 'number' && !Number.isNaN(v) ? v : 0
+export function getPlayerDelta(player: Pick<MatchPlayer, 'scoreDelta'>): number {
+  const v = player.scoreDelta
+  return typeof v === 'number' && Number.isFinite(v) ? v : 0
 }
 
 export function getSelfPlayer(record: MatchRecord): MatchPlayer | undefined {
@@ -92,12 +123,11 @@ export function getSelfPlayer(record: MatchRecord): MatchPlayer | undefined {
 
 export function getSelfDelta(record: MatchRecord): number {
   const self = getSelfPlayer(record)
-  if (!self) return 0
-  return getPlayerDelta(self, record.settleUnit)
+  if (!self || record.settleUnit !== 'score') return 0
+  return getPlayerDelta(self)
 }
 
-export function formatDelta(value: number, unit: SettleUnit): string {
-  const suffix = unit === 'score' ? '分' : '元'
+export function formatDelta(value: number): string {
   const sign = value > 0 ? '+' : ''
-  return `${sign}${value}${suffix}`
+  return `${sign}${value}分`
 }

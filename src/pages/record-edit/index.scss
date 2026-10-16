@@ -88,29 +88,8 @@
   line-height: 36px;
 }
 
-.unit-switch {
-  margin-top: 20px;
-  display: flex;
-  background: #f0f2ed;
-  border-radius: 999px;
-  padding: 6px;
-  gap: 6px;
-}
 
-.unit-btn {
-  flex: 1;
-  text-align: center;
-  font-size: 26px;
-  color: #666;
-  padding: 12px 0;
-  border-radius: 999px;
-}
 
-.unit-btn.active {
-  background: #1a5c2e;
-  color: #fff;
-  font-weight: 600;
-}
 
 .chip-row {
   display: flex;

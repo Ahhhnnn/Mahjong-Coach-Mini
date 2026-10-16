@@ -1,0 +1,57 @@
+.mystic-preview {
+  position: relative;
+  overflow: hidden;
+  padding: 30px 28px 0;
+  margin-bottom: 24px;
+  border: 1px solid #dfd6c4;
+  border-radius: 24px;
+  background: #f9f5eb;
+  color: #233e30;
+
+  &::after {
+    content: '缘';
+    position: absolute;
+    top: 38px;
+    right: 22px;
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 144px;
+    line-height: 1;
+    color: rgba(146, 113, 57, .055);
+    pointer-events: none;
+  }
+}
+
+.mystic-preview-head, .mystic-preview-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mystic-preview-title {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  font-family: 'Songti SC', 'STSong', serif;
+}
+
+.mystic-preview-scope { font-size: 21px; color: #7d786b; }
+.mystic-preview-motto { display: block; margin: 10px 0 26px; font-size: 23px; color: #7d786b; letter-spacing: 2px; }
+.mystic-preview-row { position: relative; display: flex; gap: 20px; align-items: center; margin-bottom: 24px; }
+.mystic-preview-seal {
+  flex-shrink: 0;
+  font-size: 23px;
+  font-family: 'Songti SC', 'STSong', serif;
+  letter-spacing: 2px;
+  color: #a34535;
+  padding: 8px 10px;
+  border: 2px solid #b56858;
+  border-radius: 4px;
+  transform: rotate(-4deg);
+
+  &.lucky { color: #1a5c2e; border-color: #71907a; transform: rotate(3deg); }
+}
+.mystic-preview-copy { min-width: 0; }
+.mystic-preview-name { display: block; font-size: 28px; font-weight: 650; overflow-wrap: anywhere; }
+.mystic-preview-note { display: block; margin-top: 6px; font-size: 21px; line-height: 1.6; color: #746e61; }
+.mystic-preview-footer { border-top: 1px dashed #d8ceba; padding: 22px 0; font-size: 24px; color: #1a5c2e; }

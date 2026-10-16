@@ -51,7 +51,10 @@ function cacheUser(user: UserInfo) {
 export async function ensureLogin(): Promise<UserInfo | null> {
   // 先检查缓存
   const cached = getCachedUser()
-  if (cached?.openid) return cached
+  if (cached?.openid) {
+    void syncCloudMatchesToLocal()
+    return cached
+  }
 
   try {
     const res = await Taro.cloud.callFunction({ name: 'loginUser', data: {} })

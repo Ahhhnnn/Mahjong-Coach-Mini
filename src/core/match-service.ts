@@ -1,52 +1,44 @@
 import Taro from '@tarojs/taro'
-import { createDefaultMatches, DEFAULT_MATCH_VERSION } from './default-matches'
 import { updateMatchBadges } from './match-badge-service'
 import {
+  compareMatchesByTime,
   deriveMatchResult,
+  fixedMatchRecords,
+  FIXED_MATCH_PLAYERS,
   getSelfDelta,
   makeMatchId,
+  normalizeMatchPlayers,
+  SELF_PLAYER_NAME,
   type MatchRecord,
-  type SettleUnit,
 } from './match-types'
 
 const STORAGE_KEY = 'match_records'
-const PREFER_UNIT_KEY = 'match_prefer_unit'
 const PLAYER_NAMES_KEY = 'match_player_names'
 const LOCATIONS_KEY = 'match_locations'
-const MAX_LOCAL = 300
-const DEFAULT_VERSION_KEY = 'match_default_version'
 const DELETED_KEY = 'match_deleted_ids'
+const PENDING_SAVES_KEY = 'match_pending_saves'
+const PENDING_DELETES_KEY = 'match_pending_deletes'
+const MANUAL_QUEUE_MIGRATED_KEY = 'match_manual_queue_migrated'
 let cloudSync: Promise<number> | undefined
+let syncRequested = false
 
 function deletedIds(): string[] {
+  return readIds(DELETED_KEY)
+}
+
+function readIds(key: string): string[] {
   try {
-    const ids = Taro.getStorageSync(DELETED_KEY)
+    const ids = Taro.getStorageSync(key)
     return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []
   } catch { return [] }
 }
-let initializing = false
 
-/** 必须先于读取、上传和云端合并；稳定 ID 保留用户已修改的版本。 */
-export function ensureDefaultMatches() {
-  if (initializing) return
-  initializing = true
-  try {
-    if (Taro.getStorageSync(DEFAULT_VERSION_KEY) === DEFAULT_MATCH_VERSION) return
-    const local = readLocal()
-    const ids = new Set(local.map((r) => r.id))
-    const additions = createDefaultMatches().filter((r) => !ids.has(r.id))
-    const merged = [...local, ...additions].sort((a, b) => b.playedAt - a.playedAt).slice(0, MAX_LOCAL)
-    Taro.setStorageSync(STORAGE_KEY, merged)
-    // 默认历史荣誉记为已展示，避免首次进入连续庆祝。
-    updateMatchBadges(merged, true)
-    Taro.setStorageSync(DEFAULT_VERSION_KEY, DEFAULT_MATCH_VERSION)
-    merged.forEach((record) => {
-      record.players.forEach((player) => { if (!player.isSelf) rememberName(player.name) })
-      rememberLocation(record.location)
-    })
-  } catch { /* 下次读取重试，不标记失败的初始化 */ } finally {
-    initializing = false
-  }
+function queueId(key: string, id: string) {
+  Taro.setStorageSync(key, Array.from(new Set([...readIds(key), id])))
+}
+
+function unqueueId(key: string, id: string) {
+  Taro.setStorageSync(key, readIds(key).filter((item) => item !== id))
 }
 
 function isUserLoggedIn(): boolean {
@@ -72,64 +64,40 @@ function readLocal(): MatchRecord[] {
 
 function writeLocal(items: MatchRecord[]) {
   try {
-    Taro.setStorageSync(STORAGE_KEY, items.slice(0, MAX_LOCAL))
+    Taro.setStorageSync(STORAGE_KEY, items.slice().sort(compareMatchesByTime))
   } catch {
     /* ignore */
   }
 }
 
-function syncSaveToCloud(record: MatchRecord) {
-  try {
-    ;(Taro as any).cloud
-      ?.callFunction({ name: 'saveMatch', data: record })
-      .catch(() => {})
-  } catch {
-    /* ignore */
-  }
+function requestCloudSync() {
+  syncRequested = true
+  void syncCloudMatchesToLocal()
 }
 
-function syncRemoveToCloud(id: string) {
-  try {
-    ;(Taro as any).cloud
-      ?.callFunction({ name: 'removeMatch', data: { id } })
-      .catch(() => {})
-  } catch {
-    /* ignore */
-  }
+function migrateManualQueue() {
+  if (Taro.getStorageSync(MANUAL_QUEUE_MIGRATED_KEY)) return
+  const removed = new Set(deletedIds())
+  // 升级前离线录入的 m_ 记录仍是页面操作；默认 board_ 历史绝不进入保存队列。
+  fixedMatchRecords(readLocal()).forEach((record) => {
+    if (record.id.startsWith('m_') && !removed.has(record.id)) queueId(PENDING_SAVES_KEY, record.id)
+  })
+  Taro.setStorageSync(MANUAL_QUEUE_MIGRATED_KEY, true)
 }
 
 export function listMatches(): MatchRecord[] {
-  ensureDefaultMatches()
-  return readLocal().sort((a, b) => b.playedAt - a.playedAt)
+  return fixedMatchRecords(readLocal()).sort(compareMatchesByTime)
 }
 
 export function getMatch(id: string): MatchRecord | undefined {
-  ensureDefaultMatches()
-  return readLocal().find((r) => r.id === id)
-}
-
-export function getPreferUnit(): SettleUnit {
-  try {
-    const v = Taro.getStorageSync(PREFER_UNIT_KEY)
-    return v === 'money' ? 'money' : 'score'
-  } catch {
-    return 'score'
-  }
-}
-
-export function setPreferUnit(unit: SettleUnit) {
-  try {
-    Taro.setStorageSync(PREFER_UNIT_KEY, unit)
-  } catch {
-    /* ignore */
-  }
+  return fixedMatchRecords(readLocal()).find((r) => r.id === id)
 }
 
 export function listRecentPlayerNames(limit = 12): string[] {
   try {
     const raw = Taro.getStorageSync(PLAYER_NAMES_KEY)
     if (!Array.isArray(raw)) return []
-    return raw.filter((n: string) => typeof n === 'string' && n.trim()).slice(0, limit)
+    return raw.filter((n: string) => FIXED_MATCH_PLAYERS.some((name) => name === n) && n !== SELF_PLAYER_NAME).slice(0, limit)
   } catch {
     return []
   }
@@ -147,7 +115,7 @@ export function listRecentLocations(limit = 8): string[] {
 
 function rememberName(name: string) {
   const n = name.trim()
-  if (!n || n === '我' || n === '我的') return
+  if (n === SELF_PLAYER_NAME || !FIXED_MATCH_PLAYERS.some((name) => name === n)) return
   const list = listRecentPlayerNames(40).filter((x) => x !== n)
   list.unshift(n)
   try {
@@ -177,7 +145,9 @@ export function upsertMatch(
     createdAt?: number
   }
 ): MatchRecord {
-  ensureDefaultMatches()
+  if (input.settleUnit !== 'score') throw new Error('仅支持积分牌局')
+  const players = normalizeMatchPlayers(input.players)
+  if (!players) throw new Error('牌局必须包含 HENING、WUYU、TANGXIANG、DUHAN 各一位')
   const now = Date.now()
   const existing = input.id ? getMatch(input.id) : undefined
   const id = input.id || makeMatchId()
@@ -188,23 +158,14 @@ export function upsertMatch(
     playedAt: input.playedAt || now,
     variant: input.variant || 'xuezhan',
     location: input.location?.trim() || undefined,
-    settleUnit: input.settleUnit || 'score',
+    settleUnit: 'score',
     result,
-    players: input.players.map((p, i) => {
-      let name = (p.name || '').trim()
-      if (p.isSelf) {
-        name = name || '我'
-      } else if (!name || name === '玩家') {
-        // 避免多名「玩家」在排行榜里被合并成一人
-        name = `玩家${i + 1}`
-      }
-      return { ...p, name }
-    }),
+    players,
     performance: input.performance,
     reasons: input.reasons?.length ? input.reasons : undefined,
     note: input.note?.trim() || undefined,
     createdAt: existing?.createdAt || input.createdAt || now,
-    updatedAt: now,
+    updatedAt: Math.max(now, (existing?.updatedAt || 0) + 1),
   }
 
   // 用本人 delta 再推导一次，保证一致
@@ -215,25 +176,27 @@ export function upsertMatch(
   const list = readLocal().filter((r) => r.id !== id)
   list.unshift(record)
   writeLocal(list)
+  queueId(PENDING_SAVES_KEY, id)
+  unqueueId(PENDING_DELETES_KEY, id)
   updateMatchBadges(list)
 
-  setPreferUnit(record.settleUnit)
   record.players.forEach((p) => {
     if (!p.isSelf) rememberName(p.name)
   })
   rememberLocation(record.location)
 
-  if (isUserLoggedIn()) syncSaveToCloud(record)
+  if (isUserLoggedIn()) requestCloudSync()
   return record
 }
 
 export function removeMatch(id: string) {
-  ensureDefaultMatches()
   Taro.setStorageSync(DELETED_KEY, Array.from(new Set([...deletedIds(), id])))
+  queueId(PENDING_DELETES_KEY, id)
+  unqueueId(PENDING_SAVES_KEY, id)
   const remaining = readLocal().filter((r) => r.id !== id)
   writeLocal(remaining)
   updateMatchBadges(remaining)
-  if (isUserLoggedIn()) syncRemoveToCloud(id)
+  if (isUserLoggedIn()) requestCloudSync()
 }
 
 function mergeMatches(local: MatchRecord[], cloud: MatchRecord[]): MatchRecord[] {
@@ -242,41 +205,72 @@ function mergeMatches(local: MatchRecord[], cloud: MatchRecord[]): MatchRecord[]
   for (const r of cloud) {
     if (r?.id && !removed.has(r.id)) map.set(r.id, r)
   }
+  const pending = new Set(readIds(PENDING_SAVES_KEY))
+  const visibleIds = new Set(fixedMatchRecords(local).map((record) => record.id))
   for (const r of local) {
-    if (!r?.id) continue
-    const exist = map.get(r.id)
-    if (!exist || (r.updatedAt || 0) >= (exist.updatedAt || 0)) {
+    if (!r?.id || removed.has(r.id)) continue
+    // 仅待上传的页面编辑覆盖云端；旧匿名数据保留，但不自动上传或展示。
+    if (pending.has(r.id) || !visibleIds.has(r.id)) {
       map.set(r.id, r)
     }
   }
-  return Array.from(map.values()).sort((a, b) => b.playedAt - a.playedAt)
+  return Array.from(map.values()).sort(compareMatchesByTime)
 }
 
-/** 合并后再上传，避免默认种子覆盖云端已经编辑过的历史牌局。 */
+/** 仅同步页面录入的变更并拉取云端历史，绝不调用初始化函数或补入默认数据。 */
 export function syncCloudMatchesToLocal(): Promise<number> {
-  ensureDefaultMatches()
   if (!isUserLoggedIn()) return Promise.resolve(0)
   if (cloudSync) return cloudSync
   cloudSync = (async () => {
     try {
-      const res = await (Taro as any).cloud.callFunction({ name: 'getMatches', data: {} })
-      if (!res?.result?.ok || !Array.isArray(res.result.matches)) return 0
-      const cloud: MatchRecord[] = res.result.matches
-      // 请求期间可能发生编辑或删除，这里读取最新本地状态。
-      const local = readLocal()
-      const merged = mergeMatches(local, cloud)
-      writeLocal(merged)
-      updateMatchBadges(merged)
-      const changed = merged.filter((r) => {
-        const previous = local.find((item) => item.id === r.id)
-        return !previous || JSON.stringify(previous) !== JSON.stringify(r)
-      }).length
-      deletedIds().forEach(syncRemoveToCloud)
-      // 上传不存在或本地更新的记录；请求失败时等待下一次打开重试。
-      merged.slice(0, MAX_LOCAL).forEach((record) => {
-        const remote = cloud.find((item) => item.id === record.id)
-        if (!remote || record.updatedAt > remote.updatedAt) syncSaveToCloud(record)
-      })
+      let changed = 0
+      migrateManualQueue()
+      do {
+        syncRequested = false
+        for (const id of readIds(PENDING_DELETES_KEY)) {
+          const response = await (Taro as any).cloud.callFunction({ name: 'removeMatch', data: { id } })
+          if (!response?.result?.ok) return changed
+          unqueueId(PENDING_DELETES_KEY, id)
+        }
+        const pending = new Set(readIds(PENDING_SAVES_KEY))
+        const saves = fixedMatchRecords(readLocal()).filter((record) => pending.has(record.id)).sort(compareMatchesByTime)
+        for (const record of saves) {
+          // 请求间隙发生的删除或编辑留给下一轮，不上传过时快照。
+          const current = getMatch(record.id)
+          if (deletedIds().includes(record.id) || JSON.stringify(current) !== JSON.stringify(record)) continue
+          const response = await (Taro as any).cloud.callFunction({ name: 'saveMatch', data: record })
+          if (!response?.result?.ok) return changed
+          if (response.result.deleted) {
+            queueId(DELETED_KEY, record.id)
+            unqueueId(PENDING_SAVES_KEY, record.id)
+            continue
+          }
+          if (JSON.stringify(getMatch(record.id)) === JSON.stringify(record)) {
+            unqueueId(PENDING_SAVES_KEY, record.id)
+          }
+        }
+        const res = await (Taro as any).cloud.callFunction({
+          name: 'getMatches', data: {},
+        })
+        if (!res?.result?.ok || !Array.isArray(res.result.matches)) return changed
+        const cloud: MatchRecord[] = res.result.matches
+        const remoteDeleted: string[] = Array.isArray(res.result.deletedIds)
+          ? res.result.deletedIds.filter((id: unknown): id is string => typeof id === 'string') : []
+        Taro.setStorageSync(DELETED_KEY, Array.from(new Set([...deletedIds(), ...remoteDeleted])))
+        // 请求期间可能发生编辑或删除，保留最新本地状态，并在下一轮继续同步。
+        const local = readLocal()
+        const merged = mergeMatches(local, cloud)
+        writeLocal(merged)
+        updateMatchBadges(merged, local.length === 0)
+        merged.forEach((record) => {
+          record.players.forEach((player) => { if (!player.isSelf) rememberName(player.name) })
+          rememberLocation(record.location)
+        })
+        changed += merged.filter((r) => {
+          const previous = local.find((item) => item.id === r.id)
+          return !previous || JSON.stringify(previous) !== JSON.stringify(r)
+        }).length
+      } while (syncRequested)
       return changed
     } catch {
       return 0
@@ -286,6 +280,6 @@ export function syncCloudMatchesToLocal(): Promise<number> {
 }
 
 export function pushLocalMatchesToCloud() {
-  // 与拉取共享同一个进行中的请求，先合并再推送。
+  // 只重试页面保存队列，与拉取共享同一个进行中的请求。
   void syncCloudMatchesToLocal()
 }
