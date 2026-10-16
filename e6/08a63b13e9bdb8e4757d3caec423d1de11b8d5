@@ -1,0 +1,21 @@
+package.json
+  s_89f0aef47b061d::t_c010ab844ad3cc 35
+pnpm-lock.yaml
+  s_89f0aef47b061d::t_06ec4e471ffb7b 44-46,1272,2635-2637,5111-5113,5440-5442,8297-8301,10832-10833,11185-11188
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "e608a63b13e9bdb8e4757d3caec423d1de11b8d5",
+  "prompts": {},
+  "sessions": {
+    "s_89f0aef47b061d": {
+      "agent_id": {
+        "tool": "codefuse",
+        "id": "session-f49496ee-a6ad-44a2-ae7b-fc708a5e4326",
+        "model": "codefuse_official_channel/Qwen3.8-2.4T-A95B:glink_domestic"
+      },
+      "human_author": "yining <hening.he@antgroup.com>"
+    }
+  }
+}
