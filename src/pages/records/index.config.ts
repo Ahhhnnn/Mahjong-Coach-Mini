@@ -1,4 +1,7 @@
 export default definePageConfig({
+  ...(process.env.TARO_ENV === 'weapp' ? {
+    usingComponents: { 'ec-canvas': '../../components/ec-canvas/ec-canvas' },
+  } : {}),
   navigationBarTitleText: '我的牌局',
   navigationBarBackgroundColor: '#1a5c2e',
   navigationBarTextStyle: 'white',

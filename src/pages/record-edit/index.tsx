@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { View, Text, Input, Picker } from '@tarojs/components'
+import { View, Text, Input, Picker, Textarea } from '@tarojs/components'
 import Taro, { useLoad } from '@tarojs/taro'
 import { Button } from '@taroify/core'
 import {
@@ -51,10 +51,11 @@ function startOfToday() {
   return d
 }
 
-function buildDayOptions() {
+function buildDayOptions(earliest?: number) {
   const today = startOfToday()
   const days: { label: string; time: number }[] = []
-  for (let i = DAY_SPAN - 1; i >= 0; i -= 1) {
+  const span = Math.max(DAY_SPAN, earliest ? Math.ceil((today.getTime() - earliest) / 86400000) + 2 : DAY_SPAN)
+  for (let i = span - 1; i >= 0; i -= 1) {
     const d = new Date(today)
     d.setDate(today.getDate() - i)
     const label =
@@ -116,7 +117,7 @@ function withAutoLastDelta(list: PlayerDraft[]): PlayerDraft[] {
 }
 
 export default function RecordEditPage() {
-  const dayOptions = useMemo(() => buildDayOptions(), [])
+  const [dayOptions, setDayOptions] = useState(() => buildDayOptions())
   const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => pad2(i)), [])
   const minutes = useMemo(() => Array.from({ length: 60 }, (_, i) => pad2(i)), [])
   const multiRange = useMemo(
@@ -132,6 +133,7 @@ export default function RecordEditPage() {
   const [players, setPlayers] = useState<PlayerDraft[]>(emptyPlayers)
   const [performance, setPerformance] = useState<MatchPerformance | undefined>('good')
   const [reasons, setReasons] = useState<MatchReason[]>([])
+  const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
 
   const recentNames = useMemo(() => listRecentPlayerNames(), [])
@@ -152,7 +154,9 @@ export default function RecordEditPage() {
     const record = getMatch(id)
     if (!record) return
     setEditId(record.id)
+    setDayOptions(buildDayOptions(record.playedAt))
     setPlayedAt(record.playedAt)
+    setNote(record.note || '')
     setLocation(record.location || '')
     setSettleUnit(record.settleUnit)
     setPerformance(record.performance)
@@ -253,6 +257,7 @@ export default function RecordEditPage() {
         players: parsed,
         performance,
         reasons,
+        note,
       })
       Taro.showToast({ title: '已保存', icon: 'success' })
       setTimeout(() => Taro.navigateBack(), 400)
@@ -442,6 +447,11 @@ export default function RecordEditPage() {
             </View>
           ))}
         </View>
+      </View>
+
+      <View className="section-card">
+        <Text className="sub-label">牌局备注</Text>
+        <Textarea className="record-note-input" value={note} maxlength={500} placeholder="记下这场牌局的故事…" onInput={(event) => setNote(event.detail.value)} />
       </View>
 
       <View className="ai-tip">

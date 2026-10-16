@@ -1,0 +1,85 @@
+.honor-section {
+  background: linear-gradient(145deg, #123e2e, #0b271e);
+  border: 1px solid rgba(220, 188, 119, .24);
+  border-radius: 28px;
+  padding: 30px 24px;
+  margin-bottom: 24px;
+  color: #f1e7cf;
+  box-shadow: 0 12px 30px rgba(12, 49, 32, .13);
+}
+.honor-heading { display: flex; align-items: center; justify-content: space-between; }
+.honor-eyebrow { display: block; font-size: 17px; letter-spacing: 5px; color: #b8a579; }
+.honor-title { display: block; font-size: 34px; font-weight: 700; margin-top: 10px; }
+.honor-count { font-size: 44px; color: #edc779; font-weight: 700; }
+.honor-count-total { font-size: 24px; color: #8aa393; font-weight: 400; }
+.honor-intro { display: block; color: #9bb4a7; font-size: 21px; margin: 14px 0 26px; }
+.honor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.rarity-copper { --medal-light: #f2c6a0; --medal-main: #b37c50; --medal-dark: #704831; --medal-glow: rgba(196, 140, 91, .25); }
+.rarity-silver { --medal-light: #f0f5f8; --medal-main: #aabac7; --medal-dark: #60747d; --medal-glow: rgba(186, 208, 219, .25); }
+.rarity-gold { --medal-light: #fff0ba; --medal-main: #d4ad5e; --medal-dark: #92652b; --medal-glow: rgba(237, 199, 121, .25); }
+.rarity-legend { --medal-light: #f7e6ff; --medal-main: #c998e2; --medal-dark: #755291; --medal-glow: rgba(199, 148, 239, .35); }
+.honor-card {
+  position: relative; border: 1px solid rgba(194, 215, 199, .10); border-radius: 22px;
+  padding: 24px 20px 20px; overflow: hidden; min-width: 0;
+  background: linear-gradient(150deg, rgba(255,255,255,.055), rgba(255,255,255,.015));
+  animation: honor-card-enter .5s ease-out both;
+  transition: transform .18s;
+  &:active { transform: scale(.97); }
+  &.is-earned { border-color: var(--medal-glow); }
+  &.is-locked { .honor-name { color: #9aafa3; } .honor-medal { opacity: .45; filter: grayscale(1); } }
+}
+.honor-card-top { position: relative; display: flex; flex-direction: column; align-items: center; padding-bottom: 18px; }
+.honor-lock { position: absolute; right: 0; top: 0; color: #708a7d; }
+.honor-rarity { color: var(--medal-light); font-size: 17px; letter-spacing: 5px; margin-top: 14px; }
+.honor-name { display: block; color: #f3ebdb; text-align: center; font-size: 28px; font-weight: 600; }
+.honor-description { display: block; color: #9bb1a5; font-size: 20px; line-height: 1.65; min-height: 68px; margin-top: 10px; }
+.honor-progress { margin-top: 18px;
+  .taroify-progress { height: 5px; background: rgba(255,255,255,.08); }
+  .taroify-progress__portion { background: linear-gradient(90deg, var(--medal-dark), var(--medal-light)); transition: width .6s ease; }
+}
+.honor-progress-label { display: block; margin-top: 12px; color: #a1b6a9; font-size: 18px; line-height: 1.5; }
+.honor-medal { width: 112px; height: 128px; position: relative; color: var(--medal-dark); }
+.medal-ribbon { position: absolute; top: 65px; width: 33px; height: 56px; background: linear-gradient(90deg, var(--medal-dark), var(--medal-main)); border: 2px solid var(--medal-main); border-radius: 2px 2px 8px 8px; }
+.ribbon-left { left: 20px; transform: rotate(18deg); }.ribbon-right { right: 20px; transform: rotate(-18deg); }
+.medal-face { position: absolute; width: 104px; height: 104px; left: 4px; top: 0; border-radius: 50%; box-sizing: border-box;
+  background: linear-gradient(145deg, var(--medal-light) 0%, var(--medal-main) 36%, var(--medal-dark) 52%, var(--medal-main) 68%, var(--medal-light) 100%);
+  padding: 8px; box-shadow: 0 5px 0 var(--medal-dark), 0 10px 25px var(--medal-glow);
+}
+.medal-inner { border-radius: 50%; width: 100%; height: 100%; box-sizing: border-box; border: 2px solid var(--medal-light);
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--medal-light), var(--medal-main));
+}
+.medal-glint { position: absolute; top: 0; left: 4px; width: 104px; height: 104px; border-radius: 50%; overflow: hidden; pointer-events: none;
+  &::after { content: ''; position: absolute; top: -25%; left: -80%; height: 150%; width: 45%; transform: rotate(25deg); background: linear-gradient(90deg, transparent, rgba(255,255,255,.7), transparent); }
+}
+.earned .medal-glint::after { animation: honor-shine 1.2s .4s ease-out both; }
+.honor-popup.taroify-popup { width: 84%; max-width: 650px; background: #0d3024; border: 1px solid rgba(237,199,121,.4); border-radius: 32px; overflow: hidden; }
+.honor-detail { position: relative; padding: 44px 34px 36px; text-align: center; color: #f3e5c6; overflow: hidden; }
+.honor-detail-glow { position: absolute; width: 440px; height: 440px; top: -30px; left: 50%; margin-left: -220px; border-radius: 50%; background: radial-gradient(circle, var(--medal-glow), transparent 68%); pointer-events: none; }
+.honor-detail-eyebrow { display: block; color: #c0aa7a; letter-spacing: 5px; font-size: 22px; position: relative; }
+.honor-detail-medal { position: relative; display: flex; justify-content: center; margin: 40px 0 20px; }
+.honor-medal.large { width: 196px; height: 224px;
+  .medal-face, .medal-glint { width: 184px; height: 184px; left: 6px; }
+  .medal-face { padding: 12px; }
+  .medal-ribbon { top: 120px; width: 54px; height: 88px; }
+  .ribbon-left { left: 34px; }.ribbon-right { right: 34px; }
+}
+.honor-detail-title { display: block; font-size: 46px; font-weight: 700; letter-spacing: 4px; }
+.honor-detail-rarity { display: inline-block; padding: 8px 24px; margin-top: 18px; color: var(--medal-light); border: 1px solid var(--medal-glow); border-radius: 30px; font-size: 20px; }
+.honor-detail-description { display: block; color: #b3c7b9; line-height: 1.8; font-size: 25px; margin-top: 26px; }
+.honor-detail-status { display: block; color: #8ea899; font-size: 21px; margin: 18px 0 30px; }
+.honor-detail-button.taroify-button { background: linear-gradient(110deg, #d6b572, #f2d99c); color: #163d2b; border: 0; font-weight: 600; }
+.celebrating {
+  .honor-detail-medal { animation: honor-medal-pop 1.1s cubic-bezier(.2,.8,.25,1) both; }
+  .honor-detail-glow { animation: honor-halo 1.5s ease-out both; }
+}
+.honor-sparkles { position: absolute; top: 240px; left: 50%; pointer-events: none; }
+.honor-spark { position: absolute; width: 6px; height: 6px; animation: honor-spark-fade 1.5s ease-out both;
+  > view, > div { width: 6px; height: 12px; border-radius: 4px; background: #f4d394; box-shadow: 0 0 12px #f5cf7e; animation: honor-spark-travel 1.5s ease-out both; }
+}
+@keyframes honor-card-enter { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes honor-shine { from { left: -80%; } to { left: 150%; } }
+@keyframes honor-medal-pop { 0% { opacity: 0; transform: scale(.4) rotate(-16deg); } 55% { opacity: 1; transform: scale(1.12) rotate(4deg); } 100% { opacity: 1; transform: scale(1) rotate(0); } }
+@keyframes honor-halo { 0% { opacity: 0; transform: scale(.3); } 40% { opacity: 1; } 100% { opacity: .7; transform: scale(1.2); } }
+@keyframes honor-spark-travel { 0% { transform: translateY(-50px); } 100% { transform: translateY(-250px); } }
+@keyframes honor-spark-fade { 0%, 100% { opacity: 0; } 20%, 50% { opacity: 1; } }

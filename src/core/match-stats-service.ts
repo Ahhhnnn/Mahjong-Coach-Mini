@@ -10,12 +10,22 @@ import {
 import { REASON_OPTIONS } from './match-types'
 
 export type StatsRange = 'all' | 'week' | 'month' | 'quarter' | 'year'
-export type TrendSpan = 'week' | 'month' | 'quarter' | 'half' | 'year'
+export type TrendSpan = 'all' | 'week' | 'month' | 'quarter' | 'half' | 'year'
 
-export type TrendPoint = {
-  label: string
-  cumulative: number
-  time: number
+export type TrendPoint = { label: string; time: number }
+export type TrendSeries = { id: string; name: string; color: string; values: number[]; total: number }
+export type MatchTrend = { points: TrendPoint[]; series: TrendSeries[] }
+const MEMBER_COLORS = ['#56c9a0', '#78b8ef', '#ba9af4', '#ef998f', '#82cbbf']
+function memberKey(player: { name: string; isSelf: boolean }, seat: number): string {
+  return player.isSelf ? '__self__' : player.name?.trim() && player.name !== '玩家' ? player.name.trim() : `__seat_${seat}`
+}
+function memberColor(key: string): string {
+  const known: Record<string, string> = { __self__: '#edc779', WUYU: '#56c9a0', TANGXIANG: '#78b8ef', DUHAN: '#ba9af4' }
+  if (known[key]) return known[key]
+  // 名称哈希使不同筛选、增删记录后配色稳定。
+  let hash = 0
+  for (const c of key) hash = (hash * 31 + c.charCodeAt(0)) >>> 0
+  return MEMBER_COLORS[hash % MEMBER_COLORS.length]
 }
 
 export type RankEntry = {
@@ -42,15 +52,9 @@ export type MatchStats = {
   draws: number
   winRate: number
   cumulative: number
-  trend: TrendPoint[]
+  trend: MatchTrend
   ranking: RankEntry[]
   ai: AiInsight
-}
-
-function startOfDay(ts: number): number {
-  const d = new Date(ts)
-  d.setHours(0, 0, 0, 0)
-  return d.getTime()
 }
 
 export function rangeStart(range: StatsRange, now = Date.now()): number | null {
@@ -77,6 +81,7 @@ export function rangeStart(range: StatsRange, now = Date.now()): number | null {
 }
 
 export function trendSpanStart(span: TrendSpan, now = Date.now()): number {
+  if (span === 'all') return 0
   const d = new Date(now)
   d.setHours(0, 0, 0, 0)
   if (span === 'week') {
@@ -105,57 +110,28 @@ export function filterByRange(records: MatchRecord[], range: StatsRange): MatchR
   return records.filter((r) => r.playedAt >= start)
 }
 
-function formatTrendLabel(ts: number, span: TrendSpan): string {
-  const d = new Date(ts)
-  const m = d.getMonth() + 1
-  const day = d.getDate()
-  if (span === 'year' || span === 'half') return `${m}月`
-  return `${m}/${day}`
-}
-
-export function buildTrend(
-  records: MatchRecord[],
-  span: TrendSpan,
-  unit: SettleUnit
-): TrendPoint[] {
+export function buildTrend(records: MatchRecord[], span: TrendSpan, unit: SettleUnit): MatchTrend {
   const start = trendSpanStart(span)
-  const sorted = records
-    .filter((r) => r.playedAt >= start)
-    .slice()
-    .sort((a, b) => a.playedAt - b.playedAt)
-
-  let cum = 0
-  const points: TrendPoint[] = []
-  // 起点
-  points.push({ label: formatTrendLabel(start, span), cumulative: 0, time: start })
-
-  for (const r of sorted) {
-    const deltaUnit = r.settleUnit === unit ? unit : r.settleUnit
-    // 优先用目标单位字段；若本场单位不同则用本场单位 delta（避免混计时为 0）
-    const self = getSelfPlayer(r)
-    let delta = 0
-    if (self) {
-      const prefer = getPlayerDelta(self, unit)
-      const fallback = getPlayerDelta(self, r.settleUnit)
-      delta = prefer !== 0 || (unit === r.settleUnit) ? prefer : fallback
-      // 若 prefer 为 0 且该单位未填写，用本场单位
-      if (unit !== r.settleUnit) {
-        const hasPrefer =
-          unit === 'score' ? typeof self.scoreDelta === 'number' : typeof self.moneyDelta === 'number'
-        delta = hasPrefer ? prefer : fallback
-      }
-      void deltaUnit
-    } else {
-      delta = getSelfDelta(r)
-    }
-    cum += delta
-    points.push({
-      label: formatTrendLabel(r.playedAt, span),
-      cumulative: cum,
-      time: r.playedAt,
+  const sorted = records.filter((r) => r.settleUnit === unit && r.playedAt >= start)
+    .slice().sort((a, b) => a.playedAt - b.playedAt || a.id.localeCompare(b.id))
+  if (!sorted.length) return { points: [], series: [] }
+  const members = new Map<string, TrendSeries>()
+  for (const record of sorted) record.players.forEach((player, seat) => {
+    const id = memberKey(player, seat)
+    if (!members.has(id)) members.set(id, { id, name: player.isSelf ? '我' : player.name || `玩家${seat + 1}`, color: memberColor(id), values: [0], total: 0 })
+  })
+  const firstTime = span === 'all' ? sorted[0].playedAt - 1 : start
+  const points: TrendPoint[] = [{ label: '起点', time: firstTime }]
+  for (const record of sorted) {
+    const deltas = new Map(record.players.map((p, seat) => [memberKey(p, seat), getPlayerDelta(p, unit)]))
+    members.forEach((series, id) => {
+      series.total += deltas.get(id) || 0
+      series.values.push(series.total)
     })
+    const d = new Date(record.playedAt)
+    points.push({ label: `${d.getMonth() + 1}/${d.getDate()}`, time: record.playedAt })
   }
-  return points
+  return { points, series: Array.from(members.values()).sort((a, b) => Number(b.id === '__self__') - Number(a.id === '__self__') || a.id.localeCompare(b.id)) }
 }
 
 export function buildRanking(records: MatchRecord[], unit: SettleUnit): RankEntry[] {
@@ -169,14 +145,7 @@ export function buildRanking(records: MatchRecord[], unit: SettleUnit): RankEntr
       const key = p.isSelf ? '__self__' : isAnon ? `__seat_${seatIndex}` : rawName
       if (!key) return
 
-      const delta =
-        unit === r.settleUnit
-          ? getPlayerDelta(p, unit)
-          : (() => {
-              const has =
-                unit === 'score' ? typeof p.scoreDelta === 'number' : typeof p.moneyDelta === 'number'
-              return has ? getPlayerDelta(p, unit) : getPlayerDelta(p, r.settleUnit)
-            })()
+      const delta = getPlayerDelta(p, unit)
 
       const displayName = p.isSelf ? '我' : isAnon ? `玩家${seatIndex + 1}` : rawName
       const exist = map.get(key)
@@ -296,10 +265,11 @@ export function computeMatchStats(
     unit?: SettleUnit
   } = {}
 ): MatchStats {
-  const range = options.range || 'month'
-  const trendSpan = options.trendSpan || 'week'
+  const range = options.range || 'all'
+  const trendSpan = options.trendSpan || 'all'
   const unit = options.unit || 'score'
-  const filtered = filterByRange(records, range)
+  const unitRecords = records.filter((r) => r.settleUnit === unit)
+  const filtered = filterByRange(unitRecords, range)
 
   let wins = 0
   let losses = 0
@@ -311,12 +281,7 @@ export function computeMatchStats(
     else if (r.result === 'loss') losses += 1
     else draws += 1
 
-    const self = getSelfPlayer(r)
-    if (self) {
-      const has =
-        unit === 'score' ? typeof self.scoreDelta === 'number' : typeof self.moneyDelta === 'number'
-      cumulative += has ? getPlayerDelta(self, unit) : getPlayerDelta(self, r.settleUnit)
-    }
+    cumulative += getSelfDelta(r)
   }
 
   const decisive = wins + losses
@@ -331,7 +296,7 @@ export function computeMatchStats(
     winRate,
     cumulative,
     trend: buildTrend(records, trendSpan, unit),
-    ranking: buildRanking(filtered, unit).slice(0, 10),
+    ranking: buildRanking(filtered, unit),
     ai: buildAiInsight(records),
   }
 }

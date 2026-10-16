@@ -533,3 +533,35 @@
   line-height: 1.6;
   margin-bottom: 12px;
 }
+
+// 深绿鎏金展示区
+.records-eyebrow { display: block; font-size: 17px; letter-spacing: 4px; color: #bfa979; margin-bottom: 18px; }
+.hero-card { background: linear-gradient(135deg, #164a34, #0b2f22); border: 1px solid rgba(214,181,114,.3); box-shadow: 0 12px 32px rgba(13,48,31,.16); }
+.hero-cum-value { color: #f2d595; font-size: 68px; letter-spacing: -2px; animation: records-value-enter .65s ease-out both; }
+.hero-unit { position: absolute; right: 24px; top: 28px; }
+.hero-unit-text { font-size: 20px; }
+.trend-card { background: linear-gradient(145deg, #123e2e, #0b271e); border: 1px solid rgba(220,188,119,.24); border-radius: 28px; padding: 28px 20px; margin-bottom: 24px; box-shadow: 0 12px 30px rgba(12,49,32,.13); }
+.trend-heading { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 24px; }
+.trend-title { color: #f3e7cd; font-size: 34px; font-weight: 700; }
+.trend-subtitle { color: #9eb6a8; font-size: 21px; }
+.trend-tabs { display: flex; background: rgba(0,0,0,.16); border-radius: 16px; padding: 6px; margin-bottom: 26px; }
+.trend-tab { flex: 1; text-align: center; font-size: 21px; padding: 12px 0; border-radius: 12px; color: #9ab1a3; transition: color .25s, background .25s;
+  &.active { color: #183d2c; background: linear-gradient(120deg, #d6b777, #f0d99f); font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,.13); }
+}
+.trend-no-data { height: 360px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #c4d3c9; font-size: 24px; }
+.trend-hint { display: block; text-align: center; color: #829e8e; font-size: 19px; margin-top: 18px; }
+.trend-totals { border-top: 1px solid rgba(204,216,187,.12); padding-top: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 22px; }
+.trend-member { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.trend-member-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.trend-member-name { color: #b3c8bb; font-size: 19px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trend-member-value { font-size: 23px; font-weight: 600; margin-left: auto; white-space: nowrap; }
+.ranking-scope { color: #8b998d; font-size: 22px; }
+.rank-games { color: #94a296; font-size: 20px; margin-top: 6px; }
+.rank-medal-4 { color: #6b8673; background: #edf3ed; }
+.records-empty-text { display: block; font-size: 24px; color: #93a092; padding: 24px 0; }
+.records-list-empty { text-align: center; padding-bottom: 20px; }
+.match-note { display: block; color: #a08d69; font-size: 20px; margin-top: 7px; line-height: 1.5; }
+.match-main { min-width: 0; flex: 1; padding-right: 18px; }
+.match-meta { line-height: 1.6; }
+.records-expand { margin-top: 16px; text-align: center; padding: 20px; font-size: 23px; color: #517b5a; background: #f3f6ef; border-radius: 16px; }
+@keyframes records-value-enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }

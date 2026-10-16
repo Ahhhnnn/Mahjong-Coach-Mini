@@ -1,0 +1,557 @@
+{
+  "exported_at": "2026-10-16T16:39:18",
+  "players": [
+    "WUYU",
+    "TANGXIANG",
+    "DUHAN",
+    "HENING"
+  ],
+  "rounds": [
+    {
+      "id": 1,
+      "played_at": "2026-07-01T19:00:00",
+      "location": "宽叫",
+      "note": null,
+      "created_at": "2026-07-03T14:13:01",
+      "updated_at": "2026-07-03T14:13:01",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": -84
+        },
+        {
+          "player": "TANGXIANG",
+          "score": 111
+        },
+        {
+          "player": "DUHAN",
+          "score": 60
+        },
+        {
+          "player": "HENING",
+          "score": -87
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "played_at": "2026-07-03T19:00:00",
+      "location": "棋多多",
+      "note": null,
+      "created_at": "2026-07-04T01:07:32",
+      "updated_at": "2026-07-04T01:07:32",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": 71
+        },
+        {
+          "player": "TANGXIANG",
+          "score": -91
+        },
+        {
+          "player": "DUHAN",
+          "score": 60
+        },
+        {
+          "player": "HENING",
+          "score": -40
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "played_at": "2026-07-08T19:23:00",
+      "location": "棋多多",
+      "note": null,
+      "created_at": "2026-07-09T00:24:10",
+      "updated_at": "2026-07-09T00:24:10",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": 28
+        },
+        {
+          "player": "TANGXIANG",
+          "score": -58
+        },
+        {
+          "player": "DUHAN",
+          "score": 32
+        },
+        {
+          "player": "HENING",
+          "score": -2
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "played_at": "2026-07-10T19:30:00",
+      "location": "宽叫",
+      "note": null,
+      "created_at": "2026-07-11T00:58:54",
+      "updated_at": "2026-07-11T00:58:54",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": 69
+        },
+        {
+          "player": "TANGXIANG",
+          "score": -39
+        },
+        {
+          "player": "DUHAN",
+          "score": -5
+        },
+        {
+          "player": "HENING",
+          "score": -25
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "played_at": "2026-07-18T12:00:00",
+      "location": "棋多多",
+      "note": null,
+      "created_at": "2026-07-18T16:09:03",
+      "updated_at": "2026-07-18T16:09:03",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": 5
+        },
+        {
+          "player": "TANGXIANG",
+          "score": 18
+        },
+        {
+          "player": "DUHAN",
+          "score": 20
+        },
+        {
+          "player": "HENING",
+          "score": -43
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "played_at": "2026-07-18T17:00:00",
+      "location": "棋多多",
+      "note": "WUYU 本想通过这场拿下排名第一 可惜",
+      "created_at": "2026-07-18T22:07:39",
+      "updated_at": "2026-09-03T19:10:24",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": -78
+        },
+        {
+          "player": "TANGXIANG",
+          "score": -30
+        },
+        {
+          "player": "DUHAN",
+          "score": 38
+        },
+        {
+          "player": "HENING",
+          "score": 70
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "played_at": "2026-07-24T19:09:00",
+      "location": "棋多多",
+      "note": null,
+      "created_at": "2026-07-25T00:15:07",
+      "updated_at": "2026-07-29T16:47:40",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": 14
+        },
+        {
+          "player": "TANGXIANG",
+          "score": -45
+        },
+        {
+          "player": "DUHAN",
+          "score": 2
+        },
+        {
+          "player": "HENING",
+          "score": 29
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "played_at": "2026-07-31T19:00:00",
+      "location": "宽叫",
+      "note": null,
+      "created_at": "2026-07-31T22:55:01",
+      "updated_at": "2026-07-31T22:55:01",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": -23
+        },
+        {
+          "player": "TANGXIANG",
+          "score": -10
+        },
+        {
+          "player": "DUHAN",
+          "score": 140
+        },
+        {
+          "player": "HENING",
+          "score": -107
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "played_at": "2026-08-07T19:00:00",
+      "location": "宽叫",
+      "note": null,
+      "created_at": "2026-08-08T00:59:18",
+      "updated_at": "2026-08-08T00:59:18",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": 46
+        },
+        {
+          "player": "TANGXIANG",
+          "score": 1
+        },
+        {
+          "player": "DUHAN",
+          "score": -17
+        },
+        {
+          "player": "HENING",
+          "score": -30
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "played_at": "2026-08-14T19:00:00",
+      "location": "宽叫",
+      "note": null,
+      "created_at": "2026-08-15T00:13:50",
+      "updated_at": "2026-08-15T00:14:19",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": -92
+        },
+        {
+          "player": "TANGXIANG",
+          "score": 52
+        },
+        {
+          "player": "DUHAN",
+          "score": 52
+        },
+        {
+          "player": "HENING",
+          "score": -12
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "played_at": "2026-08-15T13:10:00",
+      "location": "棋多多",
+      "note": null,
+      "created_at": "2026-08-15T17:22:08",
+      "updated_at": "2026-08-15T17:22:08",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": 17
+        },
+        {
+          "player": "TANGXIANG",
+          "score": -63
+        },
+        {
+          "player": "DUHAN",
+          "score": 30
+        },
+        {
+          "player": "HENING",
+          "score": 16
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "played_at": "2026-08-15T18:00:00",
+      "location": "棋多多",
+      "note": null,
+      "created_at": "2026-08-15T23:58:13",
+      "updated_at": "2026-08-16T00:46:22",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": 47
+        },
+        {
+          "player": "TANGXIANG",
+          "score": -57
+        },
+        {
+          "player": "DUHAN",
+          "score": 42
+        },
+        {
+          "player": "HENING",
+          "score": -32
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "played_at": "2026-08-21T19:30:00",
+      "location": "四个朋友",
+      "note": "WUYU 最破防的一场",
+      "created_at": "2026-08-22T00:12:55",
+      "updated_at": "2026-09-03T19:09:24",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": -107
+        },
+        {
+          "player": "TANGXIANG",
+          "score": 59
+        },
+        {
+          "player": "DUHAN",
+          "score": 42
+        },
+        {
+          "player": "HENING",
+          "score": 6
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "played_at": "2026-08-22T16:30:00",
+      "location": "四个朋友",
+      "note": null,
+      "created_at": "2026-08-22T21:38:17",
+      "updated_at": "2026-08-22T21:38:17",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": -43
+        },
+        {
+          "player": "TANGXIANG",
+          "score": -47
+        },
+        {
+          "player": "DUHAN",
+          "score": 20
+        },
+        {
+          "player": "HENING",
+          "score": 70
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "played_at": "2026-08-28T22:00:00",
+      "location": "晓山青",
+      "note": null,
+      "created_at": "2026-08-29T02:05:50",
+      "updated_at": "2026-08-29T02:05:50",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": 20
+        },
+        {
+          "player": "TANGXIANG",
+          "score": -27
+        },
+        {
+          "player": "DUHAN",
+          "score": 145
+        },
+        {
+          "player": "HENING",
+          "score": -138
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "played_at": "2026-09-18T19:06:00",
+      "location": "棋多多",
+      "note": null,
+      "created_at": "2026-09-19T01:06:58",
+      "updated_at": "2026-09-19T01:06:58",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": 5
+        },
+        {
+          "player": "TANGXIANG",
+          "score": -65
+        },
+        {
+          "player": "DUHAN",
+          "score": 7
+        },
+        {
+          "player": "HENING",
+          "score": 53
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "played_at": "2026-09-23T19:17:00",
+      "location": "棋多多",
+      "note": null,
+      "created_at": "2026-09-24T00:18:23",
+      "updated_at": "2026-09-24T00:18:23",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": -36
+        },
+        {
+          "player": "TANGXIANG",
+          "score": -21
+        },
+        {
+          "player": "DUHAN",
+          "score": 42
+        },
+        {
+          "player": "HENING",
+          "score": 15
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "played_at": "2026-09-24T19:00:00",
+      "location": "麻公馆",
+      "note": null,
+      "created_at": "2026-09-24T23:22:47",
+      "updated_at": "2026-09-24T23:23:19",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": 6
+        },
+        {
+          "player": "TANGXIANG",
+          "score": -21
+        },
+        {
+          "player": "DUHAN",
+          "score": -15
+        },
+        {
+          "player": "HENING",
+          "score": 30
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "played_at": "2026-10-02T22:00:00",
+      "location": "谈小娱",
+      "note": "威海",
+      "created_at": "2026-10-03T01:29:09",
+      "updated_at": "2026-10-03T01:42:52",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": -9
+        },
+        {
+          "player": "TANGXIANG",
+          "score": 72
+        },
+        {
+          "player": "DUHAN",
+          "score": 4
+        },
+        {
+          "player": "HENING",
+          "score": -67
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "played_at": "2026-10-07T14:00:00",
+      "location": "麻公馆",
+      "note": null,
+      "created_at": "2026-10-07T19:11:55",
+      "updated_at": "2026-10-07T19:11:55",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": 74
+        },
+        {
+          "player": "TANGXIANG",
+          "score": 54
+        },
+        {
+          "player": "DUHAN",
+          "score": -96
+        },
+        {
+          "player": "HENING",
+          "score": -32
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "played_at": "2026-10-10T19:10:00",
+      "location": "棋多多",
+      "note": null,
+      "created_at": "2026-10-11T01:10:47",
+      "updated_at": "2026-10-11T01:10:47",
+      "scores": [
+        {
+          "player": "WUYU",
+          "score": 74
+        },
+        {
+          "player": "TANGXIANG",
+          "score": -42
+        },
+        {
+          "player": "DUHAN",
+          "score": -61
+        },
+        {
+          "player": "HENING",
+          "score": 29
+        }
+      ]
+    }
+  ]
+}
