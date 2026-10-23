@@ -24,6 +24,10 @@ import { getLevelTitle } from '../../core/train-stats-service'
 import { listMatches } from '../../core/match-service'
 import { computeMatchStats } from '../../core/match-stats-service'
 import { formatDelta } from '../../core/match-types'
+import { useTableIdentity } from '../../hooks/use-table-identity'
+import { getTableIdentity, identityScope } from '../../core/table-identity-service'
+import { MATCHES_CHANGED } from '../../core/match-service'
+import { useEffect } from 'react'
 import mascotImg from '../../assets/mascot/panda.png'
 
 import './index.scss'
@@ -32,12 +36,14 @@ const BRAND = '#1a5c2e'
 const comingSoon = () => Taro.showToast({ title: '即将上线', icon: 'none' })
 
 export default function ProfilePage() {
+  const { identity, scope } = useTableIdentity()
   const [userInfo, setUserInfo] = useState<UserInfo | null>(getCachedUser())
   const [loggedIn, setLoggedIn] = useState(isLoggedIn())
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [loginLoading, setLoginLoading] = useState(false)
   const [editingNickname, setEditingNickname] = useState(false)
-  const [stats, setStats] = useState({
+  const [storedStats, setStats] = useState({
+    matchScope: '',
     practiced: 0,
     reasonable: 0,
     days: 0,
@@ -51,6 +57,8 @@ export default function ProfilePage() {
     matchCumText: '+0分',
   })
 
+  const stats = storedStats.matchScope === scope ? storedStats : { ...storedStats, matchTotal: 0, matchWinRate: 0, matchCumText: '+0分' }
+
   useDidShow(() => {
     setLoggedIn(isLoggedIn())
     setUserInfo(getCachedUser())
@@ -62,8 +70,9 @@ export default function ProfilePage() {
         const reasonable = records.filter((r: any) => r.reasonable).length
         const practiced = new Set(records.map((r: any) => r.puzzleId).filter(Boolean)).size
         const xp = records.reduce((s: number, r: any) => s + (r.reasonable ? 10 : 3), 0)
-        const ms = computeMatchStats(listMatches(), { range: 'month' })
+        const ms = computeMatchStats(listMatches(), { range: 'month', playerName: getTableIdentity()?.playerName })
         setStats({
+          matchScope: identityScope(),
           practiced,
           reasonable,
           days,
@@ -82,6 +91,18 @@ export default function ProfilePage() {
     refreshStats()
     loadPuzzles().then((puzzles) => refreshStats(puzzles))
   })
+
+  useEffect(() => {
+    setUserInfo(getCachedUser())
+    setLoggedIn(isLoggedIn())
+    const update = () => {
+      const ms = computeMatchStats(listMatches(), { range: 'month', playerName: getTableIdentity()?.playerName })
+      setStats((previous) => ({ ...previous, matchScope: identityScope(), matchTotal: ms.total, matchWinRate: ms.winRate, matchCumText: formatDelta(ms.cumulative) }))
+    }
+    update()
+    Taro.eventCenter.on(MATCHES_CHANGED, update)
+    return () => { Taro.eventCenter.off(MATCHES_CHANGED, update) }
+  }, [scope])
 
   const handleLogin = async () => {
     setLoginLoading(true)
@@ -303,6 +324,10 @@ export default function ProfilePage() {
         </Grid>
       </View>
 
+      <View className="profile-identity-card" onClick={() => Taro.navigateTo({ url: '/pages/identity/index' })}>
+        <View><Text className="profile-identity-label">我的牌桌身份</Text><Text className="profile-identity-name">{identity ? identity.playerName : '你的位置，留给你'}</Text><Text className="profile-identity-note">{identity ? '战绩 · 荣誉 · 玄学命簿已关联' : '认领自己的名字，即刻查看个人档案'}</Text></View>
+        <Text className="profile-identity-link">{identity ? identity.role === 'admin' ? '成员管理 ›' : '已入席 ›' : '去认领 ›'}</Text>
+      </View>
       <View className="match-banner">
         <Text className="match-banner-title">我的牌局战绩</Text>
         <Text className="match-banner-desc">

@@ -1,6 +1,6 @@
 import {
   compareMatchesByTime, fixedMatchRecords, FIXED_MATCH_PLAYERS,
-  getPlayerDelta, getSelfDelta, type MatchRecord,
+  getPlayerDelta, getSelfDelta, SELF_PLAYER_NAME, type MatchRecord,
 } from './match-types'
 import { filterBySeason, type MatchSeason } from './match-stats-service'
 
@@ -40,8 +40,8 @@ export interface MatchMystic {
 }
 
 /** 仅分析可核验的积分牌局；不根据总积分推断两人间的输赢流水。 */
-export function computeMatchMystic(records: MatchRecord[], season?: MatchSeason): MatchMystic {
-  const valid = fixedMatchRecords(records).filter((record) => Number.isFinite(record.playedAt)
+export function computeMatchMystic(records: MatchRecord[], season?: MatchSeason, selfName = SELF_PLAYER_NAME): MatchMystic {
+  const valid = fixedMatchRecords(records, selfName).filter((record) => Number.isFinite(record.playedAt)
     && record.players.every((player) => Number.isFinite(player.scoreDelta))
     && Math.abs(record.players.reduce((sum, player) => sum + player.scoreDelta!, 0)) < 1e-6)
   const games = (season ? filterBySeason(valid, season) : valid).slice().sort(compareMatchesByTime)

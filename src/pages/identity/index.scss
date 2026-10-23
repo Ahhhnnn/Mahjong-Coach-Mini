@@ -1,0 +1,23 @@
+.identity-page { min-height: 100vh; padding: 48px 32px 60px; box-sizing: border-box; background: #f5f5f0; color: #183e2a; }
+.identity-heading { padding: 12px 4px 36px; }
+.identity-kicker { display: block; font-size: 23px; color: #7c806f; letter-spacing: 5px; }
+.identity-title-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 24px 0; }
+.identity-title { font-size: 42px; font-family: 'Songti SC', STSong, serif; line-height: 1.4; }
+.identity-stamp { flex-shrink: 0; padding: 10px 6px; writing-mode: vertical-rl; border: 2px solid #a74e3a; color: #a74e3a; font-size: 22px; letter-spacing: 3px; }
+.identity-description { color: #727865; font-size: 26px; line-height: 1.8; }
+.identity-seats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; margin: 6px 0 36px; }
+.identity-seat { position: relative; padding: 26px 22px 30px; border: 2px solid #e0dfd1; border-radius: 16px; background: #fffdf8; transition: background .2s, border-color .2s; }
+.identity-seat.selected { border-color: #1a5c2e; background: #eaf0e5; }
+.identity-seat.occupied { background: #eeeee7; color: #777d71; }
+.identity-seat-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 20px; }
+.identity-seat-number { color: #929380; letter-spacing: 3px; }
+.identity-seat-status { color: #55714e; font-size: 21px; }
+.identity-seat-name { display: block; font-family: Georgia, serif; font-size: 31px; letter-spacing: 1px; margin: 35px 0 16px; overflow-wrap: anywhere; }
+.identity-seat-caption { font-size: 22px; color: #858a78; }
+.identity-release { margin-top: 24px; padding-top: 18px; border-top: 1px solid #dcded2; color: #a74e3a; font-size: 23px; }
+.identity-error { display: block; padding-bottom: 24px; color: #a74e3a; font-size: 25px; line-height: 1.7; }
+.identity-foot { margin: 30px 4px 20px; color: #888b7c; font-size: 23px; line-height: 1.9; }
+.identity-foot > text, .identity-foot > taro-text-core { display: block; margin-bottom: 12px; }
+.identity-page { --primary-color: #1a5c2e; --blue: #1a5c2e; }
+.identity-page .taroify-button { height: 88px; font-size: 28px; display: flex; align-items: center; justify-content: center; }
+.identity-page .taroify-button--text { height: 72px; font-size: 24px; color: #6c8066; }

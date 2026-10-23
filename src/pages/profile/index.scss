@@ -367,3 +367,9 @@
   color: #fff !important;
   border: 1px solid rgba(255, 255, 255, 0.65) !important;
 }
+
+.profile-identity-card { margin: 28px 24px; padding: 28px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border: 1px solid #e2ddcd; border-radius: 20px; background: #fffdf7; }
+.profile-identity-label { display: block; font-size: 22px; color: #8c8d79; letter-spacing: 3px; }
+.profile-identity-name { display: block; font-family: Georgia, 'Songti SC', serif; font-size: 34px; color: #1a5c2e; margin: 12px 0; }
+.profile-identity-note { color: #8b8e7b; font-size: 22px; }
+.profile-identity-link { flex-shrink: 0; color: #1a5c2e; font-size: 24px; }

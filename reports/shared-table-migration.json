@@ -1,0 +1,67 @@
+{
+  "verifiedAt": "2026-10-17T13:18:14.393Z",
+  "source": "src/content/default-matches.json",
+  "sourceSha256": "be1a61ad30145b8a9b97fdd83e2b9199ca513f4c1e419dad600e76fa225d09b0",
+  "tableId": "fixed-four",
+  "sourceRounds": 21,
+  "legacyCloudRounds": 21,
+  "sharedCloudRounds": 21,
+  "checkedPlayerScores": 84,
+  "differences": [],
+  "totals": {
+    "HENING": -297,
+    "WUYU": 4,
+    "TANGXIANG": -249,
+    "DUHAN": 542
+  },
+  "legacyBackupRetained": true,
+  "cloudSnapshotSaved": true,
+  "bindings": [
+    {
+      "name": "HENING",
+      "claimed": true
+    },
+    {
+      "name": "WUYU",
+      "claimed": false
+    },
+    {
+      "name": "TANGXIANG",
+      "claimed": false
+    },
+    {
+      "name": "DUHAN",
+      "claimed": false
+    }
+  ],
+  "cloudChecks": {
+    "loginBoundToHening": true,
+    "idempotentOwnClaim": true,
+    "staleSaveRejected": true,
+    "nonexistentDeleteRejected": true,
+    "clientDirectReadDenied": true
+  },
+  "databasePermissions": [
+    {
+      "collection": "match_tables",
+      "aclTag": "ADMINONLY"
+    },
+    {
+      "collection": "table_matches",
+      "aclTag": "ADMINONLY"
+    },
+    {
+      "collection": "match_reviews",
+      "aclTag": "ADMINONLY"
+    },
+    {
+      "collection": "table_migration_backups",
+      "aclTag": "ADMINONLY"
+    },
+    {
+      "collection": "matches",
+      "aclTag": "ADMINONLY"
+    }
+  ],
+  "temporaryMigrationFunctionRemoved": true
+}

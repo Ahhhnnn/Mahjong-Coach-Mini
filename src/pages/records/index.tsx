@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Picker } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Button, Tabs } from '@taroify/core'
@@ -7,37 +7,54 @@ import MatchTrendChart from '../../components/match-trend-chart'
 import MatchBadgeWall from '../../components/match-badge-wall'
 import MatchMysticCard from '../../components/match-mystic-card'
 import { computeMatchMystic } from '../../core/match-mystic-service'
-import { listMatches, syncCloudMatchesToLocal } from '../../core/match-service'
+import { listMatches, syncCloudMatchesToLocal, getMatchSyncState, discardMatchConflict, MATCHES_CHANGED } from '../../core/match-service'
 import { updateMatchBadges, type MatchBadgeView } from '../../core/match-badge-service'
 import {
   computeMatchStats, filterBySeason, getMatchSeasonAt, MATCH_SEASON_OPTIONS,
   type MatchSeason, type MatchSeasonPeriod,
 } from '../../core/match-stats-service'
 import { formatDelta, getSelfDelta, type MatchRecord } from '../../core/match-types'
-import { isLoggedIn } from '../../core/auth'
+import { useTableIdentity } from '../../hooks/use-table-identity'
+import TableIdentityGate from '../../components/table-identity-gate'
+import { getTableIdentity, identityScope } from '../../core/table-identity-service'
 import './index.scss'
 
 export default function RecordsPage() {
+  const { identity, scope } = useTableIdentity()
+  const [syncState, setSyncState] = useState(getMatchSyncState)
   const [currentSeason, setCurrentSeason] = useState<MatchSeason>(getMatchSeasonAt)
   const [season, setSeason] = useState<MatchSeason>(getMatchSeasonAt)
   const followCurrentSeason = useRef(true)
-  const [records, setRecords] = useState<MatchRecord[]>([])
-  const [badges, setBadges] = useState<MatchBadgeView[]>([])
+  const [storedRecords, setRecords] = useState<MatchRecord[]>([])
+  const [storedBadges, setBadges] = useState<MatchBadgeView[]>([])
   const [expanded, setExpanded] = useState(false)
+  const [loadedScope, setLoadedScope] = useState('')
+  const records = loadedScope === scope ? storedRecords : []
+  const badges = loadedScope === scope ? storedBadges : []
   const refresh = () => {
+    const currentIdentity = getTableIdentity()
     const list = listMatches()
+    setLoadedScope(identityScope())
     setRecords(list)
-    setBadges(updateMatchBadges(list))
+    setBadges(currentIdentity ? updateMatchBadges(list, false, currentIdentity.playerName) : [])
+    setSyncState(getMatchSyncState())
   }
   useDidShow(() => {
     const current = getMatchSeasonAt()
     setCurrentSeason(current)
     if (followCurrentSeason.current) setSeason(current)
     refresh()
-    if (isLoggedIn()) syncCloudMatchesToLocal().then(refresh)
+    if (identity) syncCloudMatchesToLocal().then(refresh)
   })
-  const stats = useMemo(() => computeMatchStats(records, { season }), [records, season])
-  const mystic = useMemo(() => computeMatchMystic(records), [records])
+  useEffect(() => {
+    refresh()
+    const update = () => refresh()
+    Taro.eventCenter.on(MATCHES_CHANGED, update)
+    if (identity) void syncCloudMatchesToLocal().then(refresh)
+    return () => { Taro.eventCenter.off(MATCHES_CHANGED, update) }
+  }, [scope])
+  const stats = useMemo(() => computeMatchStats(records, { season, playerName: identity?.playerName }), [records, season, identity?.playerName])
+  const mystic = useMemo(() => computeMatchMystic(records, undefined, identity?.playerName), [records, identity?.playerName])
   const filtered = useMemo(() => filterBySeason(records, season), [records, season])
   const years = useMemo(() => Array.from(new Set([
     currentSeason.year, season.year,
@@ -52,8 +69,17 @@ export default function RecordsPage() {
   const seasonOption = MATCH_SEASON_OPTIONS.find((option) => option.value === season.period)!
   const seasonLabel = `${season.year} ${seasonOption.label}${season.period === 'all' ? '' : ' 赛季'}`
   const isCurrentSeason = season.year === currentSeason.year && season.period === currentSeason.period
+  if (!identity) return <TableIdentityGate />
   return (
     <View className="records-page">
+      <View className="records-identity-row"><Text>{identity.playerName} · 我的牌局</Text><Text onClick={() => { void syncCloudMatchesToLocal().then(refresh) }}>刷新同步</Text></View>
+      {(syncState.pending > 0 || syncState.conflicts.length > 0) && <View className="records-sync-note">
+        {syncState.pending > 0 && <Text>{syncState.pending} 项变更待同步，联网后自动重试。</Text>}
+        {syncState.conflicts.map((item) => <View className="records-conflict" key={item.id}><Text>{item.message}，本机草稿已保留。</Text><View>
+          {(item.draft || records.some((r) => r.id === item.id)) && <Text onClick={() => Taro.navigateTo({ url: `/pages/record-edit/index?id=${encodeURIComponent(item.id)}&draft=1` })}>核对并重新编辑</Text>}
+          <Text onClick={() => { void Taro.showModal({ title: '放弃本机草稿', content: '仅放弃未同步的修改，云端牌局不受影响。' }).then((r) => { if (r.confirm) { discardMatchConflict(item.id); refresh() } }) }}>放弃草稿</Text>
+        </View></View>)}
+      </View>}
       <View className="records-top">
         <Picker mode="selector" range={years.map((year) => `${year} 年`)} value={years.indexOf(season.year)}
           onChange={(event) => {
@@ -105,7 +131,7 @@ export default function RecordsPage() {
         ))}
       </View>
       <MatchMysticCard stats={mystic} />
-      {!!badges.length && <MatchBadgeWall badges={badges} />}
+      {!!badges.length && <MatchBadgeWall key={scope} badges={badges} playerName={identity.playerName} />}
       <View className="section-card section-card-last">
         <View className="section-head"><Text className="section-title">牌局足迹</Text><Text className="ranking-scope">{seasonOption.label} · 共 {filtered.length} 场</Text></View>
         {!filtered.length && <View className="records-list-empty"><Text className="records-empty-text">{seasonLabel}暂无牌局，记下下一场精彩</Text><Button color="primary" shape="round" onClick={() => goEdit()}>记一场牌局</Button></View>}

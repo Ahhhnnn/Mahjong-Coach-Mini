@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { View, Text, Input, Picker, Textarea } from '@tarojs/components'
 import Taro, { useLoad } from '@tarojs/taro'
 import { Button } from '@taroify/core'
@@ -16,6 +16,9 @@ import {
   listRecentLocations,
   removeMatch,
   upsertMatch,
+  getMatchConflict,
+  discardMatchConflict,
+  syncCloudMatchesToLocal,
 } from '../../core/match-service'
 import {
   PERFORMANCE_OPTIONS,
@@ -28,6 +31,10 @@ import {
   type MatchReason,
   type MatchVariant,
 } from '../../core/match-types'
+
+import { useTableIdentity } from '../../hooks/use-table-identity'
+import { identityScope } from '../../core/table-identity-service'
+import TableIdentityGate from '../../components/table-identity-gate'
 
 import './index.scss'
 
@@ -80,8 +87,8 @@ function formatDisplayTime(ts: number) {
   return `${d.getMonth() + 1}/${d.getDate()} ${hm}`
 }
 
-function emptyPlayers(): PlayerDraft[] {
-  return FIXED_MATCH_PLAYERS.map((name) => ({ name, isSelf: name === SELF_PLAYER_NAME, delta: '' }))
+function emptyPlayers(selfName: string = SELF_PLAYER_NAME): PlayerDraft[] {
+  return FIXED_MATCH_PLAYERS.map((name) => ({ name, isSelf: name === selfName, delta: '' }))
 }
 
 const LAST_PLAYER_INDEX = 3
@@ -111,6 +118,11 @@ function withAutoLastDelta(list: PlayerDraft[]): PlayerDraft[] {
 }
 
 export default function RecordEditPage() {
+  const { identity, scope } = useTableIdentity()
+  const [route, setRoute] = useState<{ id?: string; draft?: string }>({})
+  const [loadedRevision, setLoadedRevision] = useState<number>()
+  const [loadedScope, setLoadedScope] = useState('')
+  const [loadError, setLoadError] = useState('')
   const [dayOptions, setDayOptions] = useState(() => buildDayOptions())
   const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => pad2(i)), [])
   const minutes = useMemo(() => Array.from({ length: 60 }, (_, i) => pad2(i)), [])
@@ -123,7 +135,7 @@ export default function RecordEditPage() {
   const [playedAt, setPlayedAt] = useState(Date.now())
   const [variant] = useState<MatchVariant>('xuezhan')
   const [location, setLocation] = useState('家庭局')
-  const [players, setPlayers] = useState<PlayerDraft[]>(emptyPlayers)
+  const [players, setPlayers] = useState<PlayerDraft[]>(() => emptyPlayers(identity?.playerName))
   const [performance, setPerformance] = useState<MatchPerformance | undefined>('good')
   const [reasons, setReasons] = useState<MatchReason[]>([])
   const [note, setNote] = useState('')
@@ -140,29 +152,34 @@ export default function RecordEditPage() {
     return [dayIdx, d.getHours(), d.getMinutes()]
   }, [playedAt, dayOptions])
 
-  useLoad((opts) => {
-    const id = opts?.id as string | undefined
-    if (!id) return
-    const record = getMatch(id)
-    if (!record) return
-    setEditId(record.id)
-    setDayOptions(buildDayOptions(record.playedAt))
-    setPlayedAt(record.playedAt)
-    setNote(record.note || '')
-    setLocation(record.location || '')
-    setPerformance(record.performance)
-    setReasons(record.reasons || [])
-    const drafts: PlayerDraft[] = record.players.slice(0, 4).map((p) => {
-      const v = p.scoreDelta
-      return {
-        name: p.name,
-        isSelf: p.isSelf,
-        delta: v === undefined || v === null ? '' : String(v),
-      }
-    })
-    setPlayers(withAutoLastDelta(drafts))
-    Taro.setNavigationBarTitle({ title: '编辑牌局' })
-  })
+  useLoad((opts) => { setRoute({ id: opts?.id, draft: opts?.draft }) })
+  useEffect(() => {
+    let active = true
+    setLoadedScope('')
+    setLoadError('')
+    if (!identity) return
+    const load = async () => {
+      if (route.id) await syncCloudMatchesToLocal()
+      if (!active || identityScope() !== scope) return
+      const record = route.id ? getMatch(route.id) : undefined
+      const draft = route.draft && route.id ? getMatchConflict(route.id)?.draft : undefined
+      if (route.id && !record && !draft) { setLoadError('这场牌局已不存在，请返回刷新'); return }
+      const source = draft || record
+      setEditId(record?.id)
+      setLoadedRevision(record?.revision)
+      setPlayedAt(source?.playedAt || Date.now())
+      if (source) setDayOptions(buildDayOptions(source.playedAt))
+      setNote(source?.note || '')
+      setLocation(source?.location || '家庭局')
+      setPerformance(source?.performance)
+      setReasons(source?.reasons || [])
+      setPlayers(source ? withAutoLastDelta(source.players.map((p) => ({ name: p.name, isSelf: p.name === identity.playerName, delta: String(p.scoreDelta ?? '') }))) : emptyPlayers(identity.playerName))
+      setLoadedScope(scope)
+      Taro.setNavigationBarTitle({ title: record ? '编辑共享牌局' : '记录共享牌局' })
+    }
+    void load()
+    return () => { active = false }
+  }, [scope, route.id, route.draft])
 
   const unitLabel = '分'
   const scoreSumPreview = useMemo(() => {
@@ -199,8 +216,9 @@ export default function RecordEditPage() {
     setPlayedAt(next.getTime())
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (saving) return
+    if (!loadedScope || identityScope() !== loadedScope) { Taro.showToast({ title: '身份已变化，请重新打开', icon: 'none' }); return }
 
     const deltas = players.map((p) => parseDeltaInput(p.delta))
     const nums = deltas.filter((v): v is number => v !== null)
@@ -229,10 +247,15 @@ export default function RecordEditPage() {
       return
     }
 
+    if (route.draft && !editId) {
+      const confirmation = await Taro.showModal({ title: '另存为新牌局', content: '云端已不存在原牌局。确认这是一场需要单独录入的对局后，将以新 ID 保存，不恢复原记录。' })
+      if (!confirmation.confirm) return
+    }
     setSaving(true)
     try {
       upsertMatch({
         id: editId,
+        revision: loadedRevision,
         playedAt,
         variant,
         location,
@@ -242,8 +265,11 @@ export default function RecordEditPage() {
         reasons,
         note,
       })
-      Taro.showToast({ title: '已保存', icon: 'success' })
+      if (route.draft && route.id) discardMatchConflict(route.id)
+      Taro.showToast({ title: '已保存，等待同步', icon: 'success' })
       setTimeout(() => Taro.navigateBack(), 400)
+    } catch (e) {
+      Taro.showToast({ title: e instanceof Error ? e.message : '保存失败，请重试', icon: 'none' })
     } finally {
       setSaving(false)
     }
@@ -253,18 +279,23 @@ export default function RecordEditPage() {
     if (!editId) return
     Taro.showModal({
       title: '删除牌局',
-      content: '删除后不可恢复，确认删除？',
+      content: '删除会同步影响四个人的战绩，确认删除这场公共牌局？',
       success: (res) => {
         if (!res.confirm) return
-        removeMatch(editId)
+        if (identityScope() !== loadedScope) return
+        try { removeMatch(editId, loadedRevision) } catch (e) { Taro.showToast({ title: e instanceof Error ? e.message : '删除失败', icon: 'none' }); return }
         Taro.showToast({ title: '已删除', icon: 'success' })
         setTimeout(() => Taro.navigateBack(), 400)
       },
     })
   }
 
+  if (!identity) return <TableIdentityGate />
+  if (loadError || loadedScope !== scope) return <View className="record-edit-page"><Text>{loadError || '正在读取牌局…'}</Text></View>
   return (
     <View className="record-edit-page">
+      {route.draft && <Text className="hint-text">正在核对本机草稿。{editId ? '保存会提交到当前云端版本。' : '原牌局已不存在，保存将另建一场，请先确认是否需要。'}</Text>}
+      <Text className="hint-text">{identity.playerName} · 四人共享牌局，修改将同步给所有人</Text>
       <View className="section-card">
         <View className="section-head">
           <NotesOutlined size={18} color={BRAND} />
@@ -362,7 +393,7 @@ export default function RecordEditPage() {
       <View className="section-card">
         <View className="section-head">
           <BarChartOutlined size={18} color={BRAND} />
-          <Text className="section-title">本场复盘</Text>
+          <Text className="section-title">本场复盘 · 仅自己可见</Text>
         </View>
         <Text className="sub-label">你的表现如何？</Text>
         <View className="perf-row">
@@ -393,7 +424,7 @@ export default function RecordEditPage() {
       </View>
 
       <View className="section-card">
-        <Text className="sub-label">牌局备注</Text>
+        <Text className="sub-label">公共备注 · 四人可见</Text>
         <Textarea className="record-note-input" value={note} maxlength={500} placeholder="记下这场牌局的故事…" onInput={(event) => setNote(event.detail.value)} />
       </View>
 

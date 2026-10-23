@@ -1,7 +1,7 @@
 import Taro from '@tarojs/taro'
 import { fetchCloudRecords, mergeRecords, syncRecordToCloud, type TrainRecord } from './cloud'
 import { pushLocalFavoritesToCloud, syncCloudFavoritesToLocal } from './favorite-service'
-import { pushLocalMatchesToCloud, syncCloudMatchesToLocal } from './match-service'
+import { syncCloudMatchesToLocal } from './match-service'
 
 /**
  * 微信小程序登录与用户信息管理
@@ -10,72 +10,43 @@ import { pushLocalMatchesToCloud, syncCloudMatchesToLocal } from './match-servic
  * - 昵称：Input type="nickname"
  */
 
-export type UserInfo = {
-  openid: string
-  nickname: string
-  avatarUrl: string
-}
+export { getCachedUser, type UserInfo } from './table-identity-service'
+import { cacheUser, getCachedUser, type UserInfo } from './table-identity-service'
 
-const STORAGE_KEY = 'user_info'
-
-/** 从 localStorage 读取缓存的用户信息 */
-export function getCachedUser(): UserInfo | null {
-  try {
-    const raw = Taro.getStorageSync(STORAGE_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as UserInfo
-  } catch {
-    return null
-  }
-}
-
-/** 判断当前是否已登录（有 openid） */
-export function isLoggedIn(): boolean {
-  return !!getCachedUser()?.openid
-}
-
-/** 缓存用户信息到 localStorage */
-function cacheUser(user: UserInfo) {
-  try {
-    Taro.setStorageSync(STORAGE_KEY, JSON.stringify(user))
-  } catch {
-    /* ignore */
-  }
-}
+export function isLoggedIn(): boolean { return !!getCachedUser()?.openid }
+let loginRequest: Promise<UserInfo | null> | undefined
 
 /**
  * 静默登录：调用 loginUser 云函数
  * 自动获取 openid，创建/查询用户记录
  * 登录成功后自动从云端恢复训练记录
  */
-export async function ensureLogin(): Promise<UserInfo | null> {
-  // 先检查缓存
-  const cached = getCachedUser()
-  if (cached?.openid) {
-    void syncCloudMatchesToLocal()
-    return cached
-  }
-
-  try {
-    const res = await Taro.cloud.callFunction({ name: 'loginUser', data: {} })
-    const result = res?.result as { ok: boolean; user?: UserInfo; error?: string }
-    if (!result?.ok || !result.user) {
-      console.warn('[auth] loginUser failed:', result?.error)
-      return null
+export function ensureLogin(): Promise<UserInfo | null> {
+  if (loginRequest) return loginRequest
+  const previous = getCachedUser()
+  loginRequest = (async () => {
+    try {
+      const res = await Taro.cloud.callFunction({ name: 'loginUser', data: {} })
+      const result = res?.result as { ok: boolean; user?: UserInfo; error?: string }
+      if (!result?.ok || !result.user) return getCachedUser()
+      const latest = getCachedUser()
+      // 认领/解绑已在登录请求途中完成时，旧登录快照不能覆盖新身份。
+      if (latest?.openid === result.user.openid && latest.identity?.bindingId !== previous?.identity?.bindingId) return latest
+      cacheUser(result.user)
+      if (previous?.openid !== result.user.openid) {
+        void syncCloudRecordsToLocal()
+        pushLocalRecordsToCloud()
+        void syncCloudFavoritesToLocal()
+        pushLocalFavoritesToCloud()
+      }
+      void syncCloudMatchesToLocal()
+      return result.user
+    } catch {
+      // 网络失败可读已绑定缓存；明确的解绑由云端身份响应处理。
+      return getCachedUser()
     }
-    cacheUser(result.user)
-    // 登录成功后双向同步：拉取云端记录 + 推送本地记录
-    syncCloudRecordsToLocal()
-    pushLocalRecordsToCloud()
-    syncCloudFavoritesToLocal()
-    pushLocalFavoritesToCloud()
-    syncCloudMatchesToLocal()
-    pushLocalMatchesToCloud()
-    return result.user
-  } catch (e: any) {
-    console.warn('[auth] login error:', e?.message)
-    return null
-  }
+  })().finally(() => { loginRequest = undefined })
+  return loginRequest
 }
 
 /**

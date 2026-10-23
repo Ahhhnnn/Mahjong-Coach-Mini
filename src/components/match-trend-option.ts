@@ -1,6 +1,12 @@
 import { graphic, type EChartsCoreOption } from './chart-engine'
 import type { MatchTrend } from '../core/match-stats-service'
 
+// 部分真机 Canvas 不识别 #RRGGBBAA；使用两端都支持的 rgba。
+function areaColor(color: string, opacity: number): string {
+  const [red, green, blue] = [1, 3, 5].map((offset) => parseInt(color.slice(offset, offset + 2), 16))
+  return `rgba(${red},${green},${blue},${opacity})`
+}
+
 export function trendOption(trend: MatchTrend): EChartsCoreOption {
   const suffix = '分'
   return {
@@ -46,7 +52,7 @@ export function trendOption(trend: MatchTrend): EChartsCoreOption {
       lineStyle: { width: s.id === '__self__' ? 3 : 2, color: s.color },
       itemStyle: { color: s.color, borderColor: '#fff3d9', borderWidth: 1 },
       areaStyle: { color: new graphic.LinearGradient(0, 0, 0, 1, [
-        { offset: 0, color: `${s.color}24` }, { offset: 1, color: `${s.color}00` },
+        { offset: 0, color: areaColor(s.color, 0.14) }, { offset: 1, color: areaColor(s.color, 0) },
       ]) },
       emphasis: { focus: 'series', lineStyle: { width: 4 } },
       ...(index === 0 ? { markLine: {

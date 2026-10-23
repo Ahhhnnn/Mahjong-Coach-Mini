@@ -1,285 +1,198 @@
 import Taro from '@tarojs/taro'
 import { updateMatchBadges } from './match-badge-service'
+import { clearTableIdentity, getTableIdentity, identityScope } from './table-identity-service'
 import {
-  compareMatchesByTime,
-  deriveMatchResult,
-  fixedMatchRecords,
-  FIXED_MATCH_PLAYERS,
-  getSelfDelta,
-  makeMatchId,
-  normalizeMatchPlayers,
-  SELF_PLAYER_NAME,
-  type MatchRecord,
+  compareMatchesByTime, deriveMatchResult, fixedMatchRecords, FIXED_MATCH_PLAYERS,
+  getSelfDelta, makeMatchId, normalizeMatchPlayers, type MatchRecord,
 } from './match-types'
 
-const STORAGE_KEY = 'match_records'
-const PLAYER_NAMES_KEY = 'match_player_names'
-const LOCATIONS_KEY = 'match_locations'
-const DELETED_KEY = 'match_deleted_ids'
-const PENDING_SAVES_KEY = 'match_pending_saves'
-const PENDING_DELETES_KEY = 'match_pending_deletes'
-const MANUAL_QUEUE_MIGRATED_KEY = 'match_manual_queue_migrated'
-let cloudSync: Promise<number> | undefined
-let syncRequested = false
-
-function deletedIds(): string[] {
-  return readIds(DELETED_KEY)
+interface Pending {
+  kind: 'save' | 'remove'
+  revision: number
+  mutationId: string
+  base?: MatchRecord
 }
-
-function readIds(key: string): string[] {
-  try {
-    const ids = Taro.getStorageSync(key)
-    return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []
-  } catch { return [] }
-}
-
-function queueId(key: string, id: string) {
-  Taro.setStorageSync(key, Array.from(new Set([...readIds(key), id])))
-}
-
-function unqueueId(key: string, id: string) {
-  Taro.setStorageSync(key, readIds(key).filter((item) => item !== id))
-}
-
-function isUserLoggedIn(): boolean {
-  try {
-    const raw = Taro.getStorageSync('user_info')
-    if (!raw) return false
-    const user = typeof raw === 'string' ? JSON.parse(raw) : raw
-    return !!user?.openid
-  } catch {
-    return false
+export interface MatchConflict { id: string; message: string; draft?: MatchRecord }
+interface Cache { records: MatchRecord[]; pending: Record<string, Pending>; conflicts: MatchConflict[] }
+export const MATCHES_CHANGED = 'table-matches-changed'
+const flights = new Map<string, Promise<number>>()
+const requested = new Set<string>()
+const empty = (): Cache => ({ records: [], pending: {}, conflicts: [] })
+function read(scope = identityScope()): Cache {
+  if (!scope) return empty()
+  const raw = Taro.getStorageSync(scope)
+  if (raw?.records && raw.pending && Array.isArray(raw.conflicts)) return raw
+  const cache = empty()
+  // 旧版待上传数据只作为草稿待核对，绝不拿旧缓存覆盖共享牌局。
+  if (getTableIdentity()?.role === 'admin') {
+    const oldRecords = Taro.getStorageSync('match_records')
+    const oldPending = Taro.getStorageSync('match_pending_saves')
+    if (Array.isArray(oldRecords) && Array.isArray(oldPending)) {
+      cache.conflicts = oldRecords.filter((r) => oldPending.includes(r.id)).map((draft) => ({
+        id: draft.id, draft, message: '旧版离线草稿，请先核对云端牌局再重新编辑',
+      }))
+    }
+    const oldDeletes = Taro.getStorageSync('match_pending_deletes')
+    if (Array.isArray(oldDeletes)) oldDeletes.forEach((id) => cache.conflicts.push({ id, message: '旧版离线删除，请核对后重新删除' }))
   }
+  Taro.setStorageSync(scope, cache)
+  return cache
 }
-
-function readLocal(): MatchRecord[] {
-  try {
-    const raw = Taro.getStorageSync(STORAGE_KEY)
-    if (!Array.isArray(raw)) return []
-    return raw.filter((r: MatchRecord) => r && r.id && Array.isArray(r.players))
-  } catch {
-    return []
-  }
+function write(cache: Cache, scope = identityScope()) {
+  if (!scope || identityScope() !== scope) return
+  cache.records.sort(compareMatchesByTime)
+  Taro.setStorageSync(scope, cache)
+  Taro.eventCenter?.trigger(MATCHES_CHANGED)
 }
-
-function writeLocal(items: MatchRecord[]) {
-  try {
-    Taro.setStorageSync(STORAGE_KEY, items.slice().sort(compareMatchesByTime))
-  } catch {
-    /* ignore */
-  }
+function requireIdentity() {
+  const identity = getTableIdentity()
+  if (!identity) throw new Error('请先认领自己的身份')
+  return identity
 }
-
-function requestCloudSync() {
-  syncRequested = true
+export function listMatches(): MatchRecord[] {
+  const identity = getTableIdentity()
+  return identity ? fixedMatchRecords(read().records, identity.playerName).sort(compareMatchesByTime) : []
+}
+export function getMatch(id: string): MatchRecord | undefined { return listMatches().find((r) => r.id === id) }
+export function listRecentPlayerNames(limit = 12): string[] {
+  return FIXED_MATCH_PLAYERS.filter((name) => name !== getTableIdentity()?.playerName).slice(0, limit)
+}
+export function listRecentLocations(limit = 8): string[] {
+  return [...new Set(listMatches().slice().reverse().map((r) => r.location?.trim()).filter((v): v is string => !!v))].slice(0, limit)
+}
+export function getMatchSyncState(): { pending: number; conflicts: MatchConflict[] } {
+  const cache = read()
+  return { pending: Object.keys(cache.pending).length, conflicts: cache.conflicts }
+}
+export function getMatchConflict(id: string) { return read().conflicts.find((item) => item.id === id) }
+export function discardMatchConflict(id: string) {
+  const cache = read()
+  cache.conflicts = cache.conflicts.filter((item) => item.id !== id)
+  write(cache)
+}
+function refreshBadges() {
+  const identity = getTableIdentity()
+  if (identity) updateMatchBadges(listMatches(), false, identity.playerName)
+}
+function requestSync() {
+  requested.add(identityScope())
   void syncCloudMatchesToLocal()
 }
-
-function migrateManualQueue() {
-  if (Taro.getStorageSync(MANUAL_QUEUE_MIGRATED_KEY)) return
-  const removed = new Set(deletedIds())
-  // 升级前离线录入的 m_ 记录仍是页面操作；默认 board_ 历史绝不进入保存队列。
-  fixedMatchRecords(readLocal()).forEach((record) => {
-    if (record.id.startsWith('m_') && !removed.has(record.id)) queueId(PENDING_SAVES_KEY, record.id)
-  })
-  Taro.setStorageSync(MANUAL_QUEUE_MIGRATED_KEY, true)
-}
-
-export function listMatches(): MatchRecord[] {
-  return fixedMatchRecords(readLocal()).sort(compareMatchesByTime)
-}
-
-export function getMatch(id: string): MatchRecord | undefined {
-  return fixedMatchRecords(readLocal()).find((r) => r.id === id)
-}
-
-export function listRecentPlayerNames(limit = 12): string[] {
-  try {
-    const raw = Taro.getStorageSync(PLAYER_NAMES_KEY)
-    if (!Array.isArray(raw)) return []
-    return raw.filter((n: string) => FIXED_MATCH_PLAYERS.some((name) => name === n) && n !== SELF_PLAYER_NAME).slice(0, limit)
-  } catch {
-    return []
-  }
-}
-
-export function listRecentLocations(limit = 8): string[] {
-  try {
-    const raw = Taro.getStorageSync(LOCATIONS_KEY)
-    if (!Array.isArray(raw)) return []
-    return raw.filter((n: string) => typeof n === 'string' && n.trim()).slice(0, limit)
-  } catch {
-    return []
-  }
-}
-
-function rememberName(name: string) {
-  const n = name.trim()
-  if (n === SELF_PLAYER_NAME || !FIXED_MATCH_PLAYERS.some((name) => name === n)) return
-  const list = listRecentPlayerNames(40).filter((x) => x !== n)
-  list.unshift(n)
-  try {
-    Taro.setStorageSync(PLAYER_NAMES_KEY, list.slice(0, 40))
-  } catch {
-    /* ignore */
-  }
-}
-
-function rememberLocation(location?: string) {
-  const n = (location || '').trim()
-  if (!n) return
-  const list = listRecentLocations(20).filter((x) => x !== n)
-  list.unshift(n)
-  try {
-    Taro.setStorageSync(LOCATIONS_KEY, list.slice(0, 20))
-  } catch {
-    /* ignore */
-  }
-}
-
-/** 规范化并补全 result / 时间戳后写入 */
-export function upsertMatch(
-  input: Omit<MatchRecord, 'id' | 'createdAt' | 'updatedAt' | 'result'> & {
-    id?: string
-    result?: MatchRecord['result']
-    createdAt?: number
-  }
-): MatchRecord {
-  if (input.settleUnit !== 'score') throw new Error('仅支持积分牌局')
-  const players = normalizeMatchPlayers(input.players)
-  if (!players) throw new Error('牌局必须包含 HENING、WUYU、TANGXIANG、DUHAN 各一位')
-  const now = Date.now()
+export function upsertMatch(input: Omit<MatchRecord, 'id' | 'createdAt' | 'updatedAt' | 'result'> & {
+  id?: string; result?: MatchRecord['result']; createdAt?: number
+}): MatchRecord {
+  const identity = requireIdentity()
+  if (input.settleUnit !== 'score' || !Number.isFinite(input.playedAt) || input.playedAt <= 0) throw new Error('请输入有效的积分牌局时间')
+  const players = normalizeMatchPlayers(input.players, identity.playerName)
+  if (!players || players.some((p) => !Number.isFinite(p.scoreDelta))
+    || Math.abs(players.reduce((s, p) => s + p.scoreDelta!, 0)) > 1e-6) throw new Error('四人积分必须完整且合计为零')
+  const cache = read()
   const existing = input.id ? getMatch(input.id) : undefined
-  const id = input.id || makeMatchId()
-  const result = input.result ?? deriveMatchResult(getSelfDelta({ ...input, id, result: 'draw', createdAt: now, updatedAt: now } as MatchRecord))
-
-  const record: MatchRecord = {
-    id,
-    playedAt: input.playedAt || now,
-    variant: input.variant || 'xuezhan',
-    location: input.location?.trim() || undefined,
-    settleUnit: 'score',
-    result,
-    players,
-    performance: input.performance,
-    reasons: input.reasons?.length ? input.reasons : undefined,
-    note: input.note?.trim() || undefined,
-    createdAt: existing?.createdAt || input.createdAt || now,
-    updatedAt: Math.max(now, (existing?.updatedAt || 0) + 1),
-  }
-
-  // 用本人 delta 再推导一次，保证一致
+  if (input.id && !existing) throw new Error('这场牌局已不存在，请返回刷新')
+  if (existing && input.revision !== undefined && input.revision !== existing.revision) throw new Error('牌局已更新，请返回刷新后重新编辑')
+  const now = Date.now(), id = input.id || makeMatchId()
+  const record: MatchRecord = { ...input, id, players, settleUnit: 'score',
+    location: input.location?.trim(), note: input.note?.trim(), result: 'draw',
+    revision: existing?.revision || 0, createdAt: existing?.createdAt || now, updatedAt: now }
   record.result = deriveMatchResult(getSelfDelta(record))
-
-  const removed = deletedIds()
-  if (removed.includes(id)) Taro.setStorageSync(DELETED_KEY, removed.filter((item) => item !== id))
-  const list = readLocal().filter((r) => r.id !== id)
-  list.unshift(record)
-  writeLocal(list)
-  queueId(PENDING_SAVES_KEY, id)
-  unqueueId(PENDING_DELETES_KEY, id)
-  updateMatchBadges(list)
-
-  record.players.forEach((p) => {
-    if (!p.isSelf) rememberName(p.name)
-  })
-  rememberLocation(record.location)
-
-  if (isUserLoggedIn()) requestCloudSync()
+  const previous = cache.pending[id]
+  cache.pending[id] = { kind: 'save', revision: previous?.revision ?? record.revision ?? 0,
+    mutationId: makeMatchId(), base: previous ? previous.base : existing }
+  cache.records = [...cache.records.filter((r) => r.id !== id), record]
+  cache.conflicts = cache.conflicts.filter((item) => item.id !== id)
+  write(cache)
+  refreshBadges()
+  requestSync()
   return record
 }
-
-export function removeMatch(id: string) {
-  Taro.setStorageSync(DELETED_KEY, Array.from(new Set([...deletedIds(), id])))
-  queueId(PENDING_DELETES_KEY, id)
-  unqueueId(PENDING_SAVES_KEY, id)
-  const remaining = readLocal().filter((r) => r.id !== id)
-  writeLocal(remaining)
-  updateMatchBadges(remaining)
-  if (isUserLoggedIn()) requestCloudSync()
+export function removeMatch(id: string, revision?: number) {
+  requireIdentity()
+  const cache = read(), existing = getMatch(id)
+  if (!existing) throw new Error('这场牌局已不存在')
+  if (revision !== undefined && revision !== existing.revision) throw new Error('牌局已更新，请返回刷新后重试')
+  const previous = cache.pending[id]
+  // 未发出的本地新建可以直接放弃；请求中的新建必须等回执后再删除。
+  if (previous?.kind === 'save' && previous.revision === 0 && !flights.has(identityScope())) delete cache.pending[id]
+  else cache.pending[id] = { kind: 'remove', revision: previous?.revision ?? existing.revision ?? 0,
+    mutationId: makeMatchId(), base: previous ? previous.base : existing }
+  cache.records = cache.records.filter((r) => r.id !== id)
+  cache.conflicts = cache.conflicts.filter((item) => item.id !== id)
+  write(cache)
+  refreshBadges()
+  requestSync()
 }
 
-function mergeMatches(local: MatchRecord[], cloud: MatchRecord[]): MatchRecord[] {
-  const map = new Map<string, MatchRecord>()
-  const removed = new Set(deletedIds())
-  for (const r of cloud) {
-    if (r?.id && !removed.has(r.id)) map.set(r.id, r)
-  }
-  const pending = new Set(readIds(PENDING_SAVES_KEY))
-  const visibleIds = new Set(fixedMatchRecords(local).map((record) => record.id))
-  for (const r of local) {
-    if (!r?.id || removed.has(r.id)) continue
-    // 仅待上传的页面编辑覆盖云端；旧匿名数据保留，但不自动上传或展示。
-    if (pending.has(r.id) || !visibleIds.has(r.id)) {
-      map.set(r.id, r)
-    }
-  }
-  return Array.from(map.values()).sort(compareMatchesByTime)
-}
-
-/** 仅同步页面录入的变更并拉取云端历史，绝不调用初始化函数或补入默认数据。 */
 export function syncCloudMatchesToLocal(): Promise<number> {
-  if (!isUserLoggedIn()) return Promise.resolve(0)
-  if (cloudSync) return cloudSync
-  cloudSync = (async () => {
+  const scope = identityScope(), identity = getTableIdentity()
+  if (!scope || !identity) return Promise.resolve(0)
+  const flight = flights.get(scope)
+  if (flight) return flight
+  const call = async (data: Record<string, unknown>) => {
+    const response = await Taro.cloud.callFunction({ name: 'matchTable', data: { ...data, schemaVersion: 2, bindingId: identity.bindingId } })
+    if (identityScope() !== scope) return null
+    const result = response?.result as any
+    if (['UNBOUND', 'FORBIDDEN', 'UNAUTHORIZED'].includes(result?.code)) clearTableIdentity(scope)
+    return identityScope() === scope ? result : null
+  }
+  const task = (async () => {
+    let changed = 0
     try {
-      let changed = 0
-      migrateManualQueue()
       do {
-        syncRequested = false
-        for (const id of readIds(PENDING_DELETES_KEY)) {
-          const response = await (Taro as any).cloud.callFunction({ name: 'removeMatch', data: { id } })
-          if (!response?.result?.ok) return changed
-          unqueueId(PENDING_DELETES_KEY, id)
+        requested.delete(scope)
+        const initial = read(scope)
+        for (const [id, pending] of Object.entries(initial.pending)) {
+          if (identityScope() !== scope) return changed
+          const current = read(scope)
+          if (current.pending[id]?.mutationId !== pending.mutationId) continue
+          const record = current.records.find((r) => r.id === id)
+          const result = await call({ ...(pending.kind === 'save' ? record : { id }),
+            action: pending.kind, revision: pending.revision, mutationId: pending.mutationId })
+          if (!result) return changed
+          if (!result.ok && !['CONFLICT', 'DELETED'].includes(result.code)) return changed
+          const latest = read(scope), next = latest.pending[id]
+          if (!result.ok) {
+            const draft = latest.records.find((r) => r.id === id)
+            latest.conflicts = [...latest.conflicts.filter((item) => item.id !== id), { id, draft, message: result.msg }]
+            delete latest.pending[id]
+            latest.records = latest.records.filter((r) => r.id !== id)
+            if (pending.base && result.code !== 'DELETED') latest.records.push(pending.base)
+          } else if (next?.mutationId === pending.mutationId) {
+            delete latest.pending[id]
+            latest.records = latest.records.map((r) => r.id === id ? { ...r, revision: result.revision } : r)
+          } else if (next) {
+            // 请求过程中继续编辑/删除：只前移已确认版本，不丢掉更新的草稿。
+            next.revision = result.revision
+            latest.records = latest.records.map((r) => r.id === id ? { ...r, revision: result.revision } : r)
+            requested.add(scope)
+          }
+          write(latest, scope)
         }
-        const pending = new Set(readIds(PENDING_SAVES_KEY))
-        const saves = fixedMatchRecords(readLocal()).filter((record) => pending.has(record.id)).sort(compareMatchesByTime)
-        for (const record of saves) {
-          // 请求间隙发生的删除或编辑留给下一轮，不上传过时快照。
-          const current = getMatch(record.id)
-          if (deletedIds().includes(record.id) || JSON.stringify(current) !== JSON.stringify(record)) continue
-          const response = await (Taro as any).cloud.callFunction({ name: 'saveMatch', data: record })
-          if (!response?.result?.ok) return changed
-          if (response.result.deleted) {
-            queueId(DELETED_KEY, record.id)
-            unqueueId(PENDING_SAVES_KEY, record.id)
+        const result = await call({ action: 'list' })
+        if (!result?.ok || !Array.isArray(result.matches)) return changed
+        const latest = read(scope)
+        const firstLoad = !latest.records.length
+        const removed = new Set<string>(result.deletedIds || [])
+        const cloudRecords = fixedMatchRecords(result.matches, identity.playerName)
+        const merged = new Map<string, MatchRecord>(cloudRecords.map((r) => [r.id, r]))
+        for (const [id, pending] of Object.entries(latest.pending)) {
+          const draft = latest.records.find((r) => r.id === id)
+          if (removed.has(id)) {
+            latest.conflicts = [...latest.conflicts.filter((item) => item.id !== id), { id, draft, message: '这场牌局已经被删除' }]
+            delete latest.pending[id]
             continue
           }
-          if (JSON.stringify(getMatch(record.id)) === JSON.stringify(record)) {
-            unqueueId(PENDING_SAVES_KEY, record.id)
-          }
+          if (pending.kind === 'remove') merged.delete(id)
+          else if (draft) merged.set(id, draft)
         }
-        const res = await (Taro as any).cloud.callFunction({
-          name: 'getMatches', data: {},
-        })
-        if (!res?.result?.ok || !Array.isArray(res.result.matches)) return changed
-        const cloud: MatchRecord[] = res.result.matches
-        const remoteDeleted: string[] = Array.isArray(res.result.deletedIds)
-          ? res.result.deletedIds.filter((id: unknown): id is string => typeof id === 'string') : []
-        Taro.setStorageSync(DELETED_KEY, Array.from(new Set([...deletedIds(), ...remoteDeleted])))
-        // 请求期间可能发生编辑或删除，保留最新本地状态，并在下一轮继续同步。
-        const local = readLocal()
-        const merged = mergeMatches(local, cloud)
-        writeLocal(merged)
-        updateMatchBadges(merged, local.length === 0)
-        merged.forEach((record) => {
-          record.players.forEach((player) => { if (!player.isSelf) rememberName(player.name) })
-          rememberLocation(record.location)
-        })
-        changed += merged.filter((r) => {
-          const previous = local.find((item) => item.id === r.id)
-          return !previous || JSON.stringify(previous) !== JSON.stringify(r)
-        }).length
-      } while (syncRequested)
-      return changed
-    } catch {
-      return 0
-    }
-  })().finally(() => { cloudSync = undefined })
-  return cloudSync
+        latest.records = [...merged.values()]
+        write(latest, scope)
+        updateMatchBadges(listMatches(), firstLoad, identity.playerName)
+        changed += cloudRecords.length
+      } while (requested.has(scope) && identityScope() === scope)
+    } catch { /* 离线保留缓存及明确的保存队列，下次前台或手动刷新重试。 */ }
+    return changed
+  })().finally(() => { flights.delete(scope) })
+  flights.set(scope, task)
+  return task
 }
-
-export function pushLocalMatchesToCloud() {
-  // 只重试页面保存队列，与拉取共享同一个进行中的请求。
-  void syncCloudMatchesToLocal()
-}
+export function pushLocalMatchesToCloud() { requestSync() }

@@ -27,18 +27,20 @@ export interface MatchPlayer {
 
 export const SELF_PLAYER_NAME = 'HENING'
 export const FIXED_MATCH_PLAYERS = [SELF_PLAYER_NAME, 'WUYU', 'TANGXIANG', 'DUHAN'] as const
+export type PlayerName = typeof FIXED_MATCH_PLAYERS[number]
 
 /** 只接纳能确认身份的完整四人牌局；匿名座位不能推断成某位牌友。 */
-export function normalizeMatchPlayers(players: MatchPlayer[]): MatchPlayer[] | undefined {
-  if (players.length !== FIXED_MATCH_PLAYERS.length) return undefined
+export function normalizeMatchPlayers(players: MatchPlayer[], selfName: string = SELF_PLAYER_NAME): MatchPlayer[] | undefined {
+  if (!FIXED_MATCH_PLAYERS.includes(selfName as PlayerName) || !Array.isArray(players) || players.length !== FIXED_MATCH_PLAYERS.length) return undefined
   const byName = new Map<string, MatchPlayer>()
   for (const player of players) {
+    if (!player || (player.name !== undefined && typeof player.name !== 'string')) return undefined
     const rawName = (player.name || '').trim()
     const name = player.isSelf && ['', '我', '我的'].includes(rawName)
       ? SELF_PLAYER_NAME : rawName.toUpperCase()
     if (!FIXED_MATCH_PLAYERS.some((known) => known === name)
-      || byName.has(name) || (player.isSelf && name !== SELF_PLAYER_NAME)) return undefined
-    byName.set(name, { ...player, name, isSelf: name === SELF_PLAYER_NAME })
+      || byName.has(name)) return undefined
+    byName.set(name, { ...player, name, isSelf: name === selfName })
   }
   return FIXED_MATCH_PLAYERS.map((name) => byName.get(name)!)
 }
@@ -57,6 +59,8 @@ export interface MatchRecord {
   note?: string
   createdAt: number
   updatedAt: number
+  /** 云端乐观并发版本；0 表示尚未同步的新牌局。 */
+  revision?: number
 }
 
 /** 统一按对局发生时间从早到晚排序，同一时刻按稳定 ID 排序。 */
@@ -65,11 +69,11 @@ export function compareMatchesByTime(a: MatchRecord, b: MatchRecord): number {
 }
 
 /** 保留原始存储，展示和统计仅使用固定四人的完整记录。 */
-export function fixedMatchRecords(records: MatchRecord[]): MatchRecord[] {
+export function fixedMatchRecords(records: MatchRecord[], selfName: string = SELF_PLAYER_NAME): MatchRecord[] {
   return records.flatMap((record) => {
     if (record.settleUnit !== 'score') return []
-    const players = normalizeMatchPlayers(record.players)
-    return players ? [{ ...record, players }] : []
+    const players = normalizeMatchPlayers(record.players, selfName)
+    return players ? [{ ...record, players, result: deriveMatchResult(getPlayerDelta(players.find((p) => p.name === selfName)!)) }] : []
   })
 }
 

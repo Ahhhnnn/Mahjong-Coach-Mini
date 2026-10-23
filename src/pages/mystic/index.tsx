@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Picker, ScrollView, Text, View } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Button, Popup, Tabs } from '@taroify/core'
 import { Arrow, ArrowDown, Cross } from '@taroify/icons'
-import { isLoggedIn } from '../../core/auth'
-import { listMatches, syncCloudMatchesToLocal } from '../../core/match-service'
+import { useTableIdentity } from '../../hooks/use-table-identity'
+import TableIdentityGate from '../../components/table-identity-gate'
+import { identityScope } from '../../core/table-identity-service'
+import { listMatches, syncCloudMatchesToLocal, MATCHES_CHANGED } from '../../core/match-service'
 import {
   computeMatchMystic, formatMysticRate, formatMysticScore, MYSTIC_MIN_GAMES,
 } from '../../core/match-mystic-service'
@@ -21,16 +23,27 @@ function playedAtLabel(time: number): string {
 }
 
 export default function MysticPage() {
-  const [records, setRecords] = useState<MatchRecord[]>([])
+  const { identity, scope } = useTableIdentity()
+  const [storedRecords, setRecords] = useState<MatchRecord[]>([])
+  const [loadedScope, setLoadedScope] = useState('')
+  const records = loadedScope === scope ? storedRecords : []
   const [season, setSeason] = useState<MatchSeason>()
   const [tab, setTab] = useState('opponents')
   const [evidence, setEvidence] = useState<Evidence>()
   useDidShow(() => {
-    const refresh = () => setRecords(listMatches())
+    const refresh = () => { setRecords(listMatches()); setLoadedScope(identityScope()) }
     refresh()
-    if (isLoggedIn()) void syncCloudMatchesToLocal().then(refresh)
+    if (identity) void syncCloudMatchesToLocal().then(refresh)
   })
-  const stats = useMemo(() => computeMatchMystic(records, season), [records, season])
+  useEffect(() => {
+    const refresh = () => { setRecords(listMatches()); setLoadedScope(identityScope()) }
+    refresh()
+    setEvidence(undefined)
+    Taro.eventCenter.on(MATCHES_CHANGED, refresh)
+    if (identity) void syncCloudMatchesToLocal().then(refresh)
+    return () => { Taro.eventCenter.off(MATCHES_CHANGED, refresh) }
+  }, [scope])
+  const stats = useMemo(() => computeMatchMystic(records, season, identity?.playerName), [records, season, identity?.playerName])
   const periods = useMemo(() => {
     const years = Array.from(new Set([
       getMatchSeasonAt().year,
@@ -57,10 +70,11 @@ export default function MysticPage() {
   const goEdit = (id?: string) => Taro.navigateTo({
     url: `/pages/record-edit/index${id ? `?id=${encodeURIComponent(id)}` : ''}`,
   })
+  if (!identity) return <TableIdentityGate />
   return (
     <View className="mystic-page">
       <View className="mystic-book-header">
-        <View className="mystic-book-meta"><Text>我的牌桌命簿</Text><Text>以牌为记 · 以局为据</Text></View>
+        <View className="mystic-book-meta"><Text>{identity.playerName} 的牌桌命簿</Text><Text>以牌为记 · 以局为据</Text></View>
         <View className="mystic-book-title-row">
           <View><Text className="mystic-book-title">牌桌玄学</Text><Text className="mystic-book-subtitle">冤家有路，福地有门。</Text></View>
           <View className="mystic-book-stamp"><Text>牌桌</Text><Text>有缘</Text></View>

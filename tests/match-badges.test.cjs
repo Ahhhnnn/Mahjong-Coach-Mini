@@ -48,14 +48,14 @@ test('原始 21 场只有十场老将、送财童子达标；单场最高 70 分
 
 test('撤回误授并将旧缓存时间修正为首次达标牌局时间，已读状态不变', () => {
   const old = { unlocked: { regular_10: 123, century: 234, skyrocket: 345, win_streak_3: 456, roller_coaster: 567 }, seen: ['regular_10', 'century', 'skyrocket'] }
-  const api = engine({ match_badges_v1: old })
+  const api = engine({ 'match_badges_v2:HENING': old })
   const badges = api.updateMatchBadges(api.seeds)
   const expected = Date.parse('2026-08-14T19:00:00+08:00')
   assert.equal(badges.find((b) => b.id === 'regular_10').unlockedAt, expected)
-  assert.equal(api.storage.get('match_badges_v1').unlocked.regular_10, expected)
+  assert.equal(api.storage.get('match_badges_v2:HENING').unlocked.regular_10, expected)
   for (const id of ['century', 'skyrocket', 'win_streak_3', 'roller_coaster']) assert.equal(badges.find((b) => b.id === id).unlockedAt, undefined)
-  assert.deepEqual(Object.keys(api.storage.get('match_badges_v1').unlocked).sort(), ['piggy_bank', 'regular_10'])
-  assert.deepEqual(api.storage.get('match_badges_v1').seen, ['regular_10'])
+  assert.deepEqual(Object.keys(api.storage.get('match_badges_v2:HENING').unlocked).sort(), ['piggy_bank', 'regular_10'])
+  assert.deepEqual(api.storage.get('match_badges_v2:HENING').seen, ['regular_10'])
   assert.ok(!api.getPendingBadgeIds().includes('century'))
 })
 

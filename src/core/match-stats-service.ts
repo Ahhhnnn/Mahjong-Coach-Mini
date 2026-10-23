@@ -4,6 +4,7 @@ import {
   getPlayerDelta,
   getSelfDelta,
   getSelfPlayer,
+  SELF_PLAYER_NAME,
   type MatchPerformance,
   type MatchReason,
   type MatchRecord,
@@ -53,7 +54,7 @@ function memberKey(player: { name: string; isSelf: boolean }): string {
   return player.isSelf ? '__self__' : player.name
 }
 function memberColor(key: string): string {
-  const known: Record<string, string> = { __self__: '#edc779', WUYU: '#56c9a0', TANGXIANG: '#78b8ef', DUHAN: '#ba9af4' }
+  const known: Record<string, string> = { __self__: '#edc779', HENING: '#a8b7d7', WUYU: '#56c9a0', TANGXIANG: '#78b8ef', DUHAN: '#ba9af4' }
   if (known[key]) return known[key]
   // 名称哈希使不同筛选、增删记录后配色稳定。
   let hash = 0
@@ -142,9 +143,9 @@ export function filterByRange(records: MatchRecord[], range: StatsRange): MatchR
   return records.filter((r) => r.playedAt >= start)
 }
 
-export function buildTrend(records: MatchRecord[], span: TrendSpan): MatchTrend {
+export function buildTrend(records: MatchRecord[], span: TrendSpan, selfName = SELF_PLAYER_NAME): MatchTrend {
   const start = trendSpanStart(span)
-  const sorted = fixedMatchRecords(records).filter((r) => r.settleUnit === 'score' && r.playedAt >= start)
+  const sorted = fixedMatchRecords(records, selfName).filter((r) => r.settleUnit === 'score' && r.playedAt >= start)
     .slice().sort(compareMatchesByTime)
   if (!sorted.length) return { points: [], series: [] }
   const members = new Map<string, TrendSeries>()
@@ -166,10 +167,10 @@ export function buildTrend(records: MatchRecord[], span: TrendSpan): MatchTrend 
   return { points, series: Array.from(members.values()).sort((a, b) => Number(b.id === '__self__') - Number(a.id === '__self__') || a.id.localeCompare(b.id)) }
 }
 
-export function buildRanking(records: MatchRecord[]): RankEntry[] {
+export function buildRanking(records: MatchRecord[], selfName = SELF_PLAYER_NAME): RankEntry[] {
   const map = new Map<string, RankEntry>()
 
-  for (const r of fixedMatchRecords(records).filter((record) => record.settleUnit === 'score')) {
+  for (const r of fixedMatchRecords(records, selfName).filter((record) => record.settleUnit === 'score')) {
     r.players.forEach((p) => {
       const key = memberKey(p)
 
@@ -202,8 +203,8 @@ function reasonLabel(r: MatchReason): string {
   return REASON_OPTIONS.find((o) => o.value === r)?.label || r
 }
 
-export function buildAiInsight(records: MatchRecord[]): AiInsight {
-  const recent = fixedMatchRecords(records).sort((a, b) => compareMatchesByTime(b, a)).slice(0, 20)
+export function buildAiInsight(records: MatchRecord[], selfName = SELF_PLAYER_NAME): AiInsight {
+  const recent = fixedMatchRecords(records, selfName).sort((a, b) => compareMatchesByTime(b, a)).slice(0, 20)
   const reasonCount = new Map<MatchReason, number>()
   let aggressive = 0
   let defense = 0
@@ -291,11 +292,13 @@ export function computeMatchStats(
     range?: StatsRange
     trendSpan?: TrendSpan
     season?: MatchSeason
+    playerName?: string
   } = {}
 ): MatchStats {
+  const selfName = options.playerName || SELF_PLAYER_NAME
   const range = options.range || 'all'
   const trendSpan = options.trendSpan || 'all'
-  const scoreRecords = fixedMatchRecords(records)
+  const scoreRecords = fixedMatchRecords(records, selfName)
   const filtered = options.season ? filterBySeason(scoreRecords, options.season) : filterByRange(scoreRecords, range)
 
   let wins = 0
@@ -322,9 +325,9 @@ export function computeMatchStats(
     winRate,
     cumulative,
     // 历史赛季从零累计，不能再套用相对于今天的滚动时间窗口。
-    trend: buildTrend(options.season ? filtered : records, options.season ? 'all' : trendSpan),
-    ranking: buildRanking(filtered),
-    ai: buildAiInsight(options.season ? filtered : records),
+    trend: buildTrend(options.season ? filtered : records, options.season ? 'all' : trendSpan, selfName),
+    ranking: buildRanking(filtered, selfName),
+    ai: buildAiInsight(options.season ? filtered : records, selfName),
   }
 }
 

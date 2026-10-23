@@ -15,6 +15,12 @@ exports.main = async (event, context) => {
   }
 
   try {
+    const tableResult = await db.collection('match_tables').doc('fixed-four').get()
+    const table = Array.isArray(tableResult.data) ? tableResult.data[0] : tableResult.data
+    const playerName = table?.ready ? ['HENING', 'WUYU', 'TANGXIANG', 'DUHAN']
+      .find((name) => table.members?.[name]?.openid === OPENID) : undefined
+    const identity = playerName ? { playerName, bindingId: table.members[playerName].bindingId,
+      role: table.adminOpenid === OPENID ? 'admin' : 'member', tableId: 'fixed-four' } : null
     // 查找已有用户
     const exist = await db.collection('users').where({ _openid: OPENID }).get()
     if (exist.data.length > 0) {
@@ -23,6 +29,7 @@ exports.main = async (event, context) => {
         ok: true,
         user: {
           openid: OPENID,
+          identity,
           nickname: user.nickname || '',
           avatarUrl: user.avatarUrl || '',
           createdAt: user.createdAt,
@@ -46,6 +53,7 @@ exports.main = async (event, context) => {
       ok: true,
       user: {
         openid: OPENID,
+        identity,
         nickname: '',
         avatarUrl: '',
         createdAt: new Date().toISOString(),

@@ -18,7 +18,7 @@ function Medal({ badge, large = false }: { badge: MatchBadgeView; large?: boolea
   )
 }
 
-export default function MatchBadgeWall({ badges }: { badges: MatchBadgeView[] }) {
+export default function MatchBadgeWall({ badges, playerName }: { badges: MatchBadgeView[]; playerName: string }) {
   const [selectedId, setSelectedId] = useState<string>()
   const [celebration, setCelebration] = useState<string[]>([])
   const [celebrationIndex, setCelebrationIndex] = useState(0)
@@ -30,14 +30,14 @@ export default function MatchBadgeWall({ badges }: { badges: MatchBadgeView[] })
   const celebrating = celebration.length > 0
   useEffect(() => {
     if (!badges.length) return
-    const pending = getPendingBadgeIds().filter((id) => !offered.current.has(id) && badges.some((b) => b.id === id))
+    const pending = getPendingBadgeIds(playerName).filter((id) => !offered.current.has(id) && badges.some((b) => b.id === id))
     if (pending.length) {
       pending.forEach((id) => offered.current.add(id))
       setCelebration((existing) => [...existing, ...pending])
     }
-  }, [badges])
+  }, [badges, playerName])
   const close = () => {
-    if (celebration.length) markBadgesSeen(celebration)
+    if (celebration.length) markBadgesSeen(celebration, playerName)
     setCelebration([])
     setCelebrationIndex(0)
     setSelectedId(undefined)

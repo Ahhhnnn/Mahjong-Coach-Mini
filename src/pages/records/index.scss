@@ -611,3 +611,8 @@
 .match-meta { line-height: 1.6; }
 .records-expand { margin-top: 16px; text-align: center; padding: 20px; font-size: 23px; color: #517b5a; background: #f3f6ef; border-radius: 16px; }
 @keyframes records-value-enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.records-identity-row { display: flex; justify-content: space-between; padding: 6px 0 24px; font-size: 24px; color: #668064; }
+.records-sync-note { padding: 20px 24px; margin-bottom: 24px; background: #fff7e7; border-radius: 14px; font-size: 24px; line-height: 1.8; color: #886b3c; }
+.records-conflict { margin-top: 12px; }
+.records-conflict > view > text, .records-conflict > div > taro-text-core { display: inline-block; margin-right: 28px; color: #1a5c2e; text-decoration: underline; }

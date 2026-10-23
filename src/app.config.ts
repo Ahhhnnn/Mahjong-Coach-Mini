@@ -7,6 +7,7 @@ export default defineAppConfig({
     'pages/profile/index',
   ],
   subPackages: [
+    { root: 'pages/identity', pages: ['index'] },
     {
       root: 'pages/basic',
       pages: ['index'],
