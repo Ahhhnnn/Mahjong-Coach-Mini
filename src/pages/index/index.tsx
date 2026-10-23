@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { View, Text, Image } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Grid, Badge, Button } from '@taroify/core'
@@ -21,9 +21,11 @@ import { isLoggedIn, syncCloudRecordsToLocal } from '../../core/auth'
 import { computeTrainStats, type TrainStats } from '../../core/train-stats-service'
 import { loadMistakes } from '../../core/mistake-service'
 import { listFavorites } from '../../core/favorite-service'
-import { listMatches } from '../../core/match-service'
+import { listMatches, MATCHES_CHANGED } from '../../core/match-service'
 import { computeMatchStats } from '../../core/match-stats-service'
 import { formatDelta } from '../../core/match-types'
+import { getTableIdentity, identityScope } from '../../core/table-identity-service'
+import { useTableIdentity } from '../../hooks/use-table-identity'
 
 import headerBanner from '../../assets/home/header-banner.jpg'
 import coachBanner from '../../assets/home/coach-banner.jpg'
@@ -49,11 +51,23 @@ const emptyStats: TrainStats = {
 }
 
 export default function DashboardPage() {
+  const { scope } = useTableIdentity()
   const [puzzles, setPuzzles] = useState<DiscardPuzzle[]>(getCachedPuzzles())
   const [stats, setStats] = useState<TrainStats>(emptyStats)
   const [mistakeCount, setMistakeCount] = useState(0)
   const [favoriteCount, setFavoriteCount] = useState(0)
-  const [matchBrief, setMatchBrief] = useState({ total: 0, winRate: 0, cumText: '+0分' })
+  const [storedMatchBrief, setMatchBrief] = useState({ scope: '', total: 0, winRate: 0, cumText: '+0分' })
+  const matchBrief = storedMatchBrief.scope === scope ? storedMatchBrief : { total: 0, winRate: 0, cumText: '+0分' }
+  const refreshMatchBrief = () => {
+    const ms = computeMatchStats(listMatches(), { range: 'month', playerName: getTableIdentity()?.playerName })
+    setMatchBrief({ scope: identityScope(), total: ms.total, winRate: ms.winRate, cumText: formatDelta(ms.cumulative) })
+  }
+
+  useEffect(() => {
+    refreshMatchBrief()
+    Taro.eventCenter.on(MATCHES_CHANGED, refreshMatchBrief)
+    return () => { Taro.eventCenter.off(MATCHES_CHANGED, refreshMatchBrief) }
+  }, [scope])
 
   useDidShow(() => {
     const refresh = (list = getCachedPuzzles()) => {
@@ -61,12 +75,7 @@ export default function DashboardPage() {
       setStats(computeTrainStats())
       setMistakeCount(loadMistakes(list).length)
       setFavoriteCount(listFavorites().length)
-      const ms = computeMatchStats(listMatches(), { range: 'month' })
-      setMatchBrief({
-        total: ms.total,
-        winRate: ms.winRate,
-        cumText: formatDelta(ms.cumulative),
-      })
+      refreshMatchBrief()
     }
 
     refresh()
