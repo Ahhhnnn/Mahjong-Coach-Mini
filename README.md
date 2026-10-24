@@ -136,6 +136,32 @@ node --test tests/match-cloud-sync.test.cjs tests/table-identity.test.cjs \
 
 所有牌局按 `playedAt` 从早到晚展示，同一时刻按稳定 ID 排序；`createdAt` 与云端写入时间只用于追踪，不代替对局时间。
 
+### 棋牌室抽签与提前选店
+
+「我的 → 更多服务 → 棋牌室抽签」进入独立抽取页，选择今天至未来 30 天的牌局日期后抽取地点。四人共享结果，按云端北京时间计算：全桌每天最多发起一次新抽取，且同一个牌局日期永久只能抽一次。例如今天为周六抽签后，今天不能再为其他日期抽签，明天也不能重抽周六。过去日期只能查看已有结果，不能补抽。任意成员抽取后，其他成员重新进入页面或点击刷新即可查看；不提供重抽、删除、作废入口。实际牌局地点仍由录分时填写，不自动关联选店结果。
+
+HENING 在抽取页管理名单，支持新增、改名、启停和调整展示顺序，最多 50 家，名称去除首尾空格后须唯一且为 1～100 字。已有棋牌室使用稳定 ID，只能停用，不能删除。启用项等概率抽取；没有启用项时不能抽，只有一家时仍消耗当日机会。
+
+确认抽取后，候选名称与列表高亮先快速轮换再减速，约 2.6～3 秒后用落章效果揭晓。最终地点只采用云端结果，展示随机不参与选店；云端响应较慢时继续等待确认，失败时停止动效并允许重试。播放中锁定日期、名单与重复抽取操作，提前到达的结果不会从主卡片、候选高亮或签簿提前露出。切后台、离开页面或切换身份时清理动画定时器；已经写入云端的签仍保留，返回后直接查看。动效仅涉及前端，无须单独部署云函数。
+
+`matchTable` 新增 `venueStatus`、`saveVenues`、`drawVenue`、`venueHistory`，沿用 `schemaVersion: 2` 和 `bindingId`。`venueStatus`、`drawVenue` 可携带 `targetDate: 'YYYY-MM-DD'`，省略时使用云端今天，兼容旧客户端。状态返回牌局日期 `date`、服务器当天 `today`、最晚可抽日期 `maxDate`、当天已用机会 `dailyDraw`、`canDraw` 和不可抽原因 `unavailableReason`。云端校验真实日历日期，过去或超出范围的未抽日期不可抽；已抽日期优先返回原签，不消耗每日机会。`saveVenues` 携带 `{ version, venues: [{ id?, name, enabled }] }`，新项不填 ID，云端分配 ID；版本过期返回 `CONFLICT`，保留本机编辑内容，重新加载后再编辑。`venueHistory` 接受上一页返回的 `nextCursor` 作为 `before`，每页 20 条，按牌局日期倒序，包含提前抽好的未来牌局。点击签簿条目可查看该日期结果，页面分别显示牌局日期和实际抽取日期时间。
+
+`table_venue_configs/fixed-four` 保存名单、版本及修改人时间；`table_venue_draws/fixed-four_YYYY-MM-DD` 的日期代表牌局日期，保存该日唯一结果、候选 ID/名称快照、名单版本、抽取人及实际抽取时间。抽取在数据库事务中重新校验绑定，使用 `crypto.randomInt` 选择，同时写入结果和 `match_tables/fixed-four.venueLastDraw`（实际抽取日期、目标牌局日期、抽取人时间），保证四人同时选择不同日期时也只能用一次每日机会。并发点击与响应丢失后的同日期重试均返回原签；名单后续变化、清缓存或重绑身份不重置机会。旧版已抽记录原样保留，以原日期作为牌局日期；旧版当天已抽且没有每日标记时，从当天记录恢复次数限制，无须迁移。提前抽好的当天牌局不占用当天的新机会。云函数失败时不在本地抽取。拥有云数据库管理权限的人仍能直接修改数据，此机制防止小程序客户端作弊。
+
+上线顺序（现有牌局无须迁移）：
+
+已部署过选店功能的环境不需要新增集合或索引，只需更新 `matchTable` 云函数（尤其是 `venue-actions.js`）并重新构建客户端。下面是首次部署步骤：
+
+1. 在云开发数据库创建 `table_venue_configs`、`table_venue_draws`，两个集合的客户端安全规则均设置为 `{"read": false, "write": false}`；云函数使用服务端权限访问。
+2. 为 `table_venue_draws` 创建联合索引：`tableId` 升序、`date` 降序，用于历史分页。每日唯一性由固定文档 ID 与事务保证，不依赖此查询索引。
+3. 上传部署整个 `cloudfunctions/matchTable/`（包括 `venue-actions.js`），继续兼容旧版共享牌局接口。
+4. 构建并发布小程序；HENING 首次在页面录入候选名单。名单初始为空，不使用测试数据自动初始化。
+
+```bash
+node --test tests/venue-draw.test.cjs tests/venue-status.test.cjs tests/venue-animation.test.cjs
+pnpm build:weapp
+```
+
 ## AI 模型切换
 
 `coachChat` 云函数采用 **Provider 适配器** 架构，按环境变量动态选择底层大模型，**前端无任何改动**。

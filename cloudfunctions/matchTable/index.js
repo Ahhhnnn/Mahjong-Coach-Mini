@@ -2,6 +2,7 @@ const cloud = require('wx-server-sdk')
 const { createHash, randomBytes } = require('crypto')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
+const venueAction = require('./venue-actions.js')
 const TABLE_ID = 'fixed-four'
 const NAMES = ['HENING', 'WUYU', 'TANGXIANG', 'DUHAN']
 const REASONS = ['greedy', 'aggressive', 'defense', 'discard', 'riichi_choice', 'luck']
@@ -74,6 +75,8 @@ exports.main = async (event = {}) => {
       })
     }
     if (!identity || event.bindingId !== identity.bindingId) return fail('UNBOUND', '请先认领自己的身份')
+    const venueResult = await venueAction({ event, db, tableId: TABLE_ID, openid: OPENID, readDoc, memberOf })
+    if (venueResult) return venueResult
     if (event.action === 'list') {
       const records = await pages('table_matches', { tableId: TABLE_ID })
       const reviews = await pages('match_reviews', { tableId: TABLE_ID, playerName: identity.playerName })

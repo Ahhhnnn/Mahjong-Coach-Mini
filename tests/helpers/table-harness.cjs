@@ -34,9 +34,14 @@ function server() {
   docs('match_tables').set('fixed-four', table)
   function collection(name) {
     const documents = docs(name)
-    const query = (fields = {}, offset = 0, limit = 100) => ({
-      where: (next) => query(next, offset, limit), skip: (next) => query(fields, next, limit), limit: (next) => query(fields, offset, next),
-      get: async () => ({ data: clone([...documents.values()].filter((d) => Object.entries(fields).every(([k, v]) => d[k] === v)).slice(offset, offset + limit)) }),
+    const query = (fields = {}, offset = 0, limit = 100, order) => ({
+      where: (next) => query(next, offset, limit, order), skip: (next) => query(fields, next, limit, order), limit: (next) => query(fields, offset, next, order),
+      orderBy: (field, direction) => query(fields, offset, limit, { field, direction }),
+      get: async () => {
+        const items = [...documents.values()].filter((d) => Object.entries(fields).every(([k, v]) => v?.operator === 'lt' ? d[k] < v.value : d[k] === v))
+        if (order) items.sort((a, b) => String(a[order.field]).localeCompare(String(b[order.field])) * (order.direction === 'desc' ? -1 : 1))
+        return { data: clone(items.slice(offset, offset + limit)) }
+      },
     })
     return { ...query(),
       doc: (id) => ({
@@ -47,7 +52,7 @@ function server() {
       add: async ({ data }) => { const id = data._id || String(documents.size); documents.set(id, clone(data)); return { _id: id } },
     }
   }
-  const db = { createCollection: async (name) => { docs(name) }, collection, serverDate: () => ({ serverDate: true }), runTransaction: (callback) => {
+  const db = { command: { lt: (value) => ({ operator: 'lt', value }) }, createCollection: async (name) => { docs(name) }, collection, serverDate: () => ({ serverDate: true }), runTransaction: (callback) => {
     const operation = tail.then(() => callback({ collection }))
     tail = operation.catch(() => {})
     return operation

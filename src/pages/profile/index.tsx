@@ -394,6 +394,14 @@ export default function ProfilePage() {
         <Text className="section-title">更多服务</Text>
         <Cell.Group className="service-group">
           <Cell
+            icon={<CalendarOutlined size={20} color={BRAND} />}
+            title="棋牌室抽签"
+            isLink
+            onClick={() => Taro.navigateTo({ url: '/pages/venue/index' })}
+          >
+            提前选店
+          </Cell>
+          <Cell
             icon={<Image className="service-mascot" src={mascotImg} mode="aspectFill" />}
             title="我的教练"
             isLink
