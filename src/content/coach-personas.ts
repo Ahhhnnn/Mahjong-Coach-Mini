@@ -18,13 +18,6 @@ export const DEFAULT_COACH_ID = 'hehe'
 
 export const COACH_PERSONAS: CoachPersona[] = [
   {
-    id: 'zhouxx',
-    name: '周猩猩',
-    tagline: '搞笑技术流，边笑边学会',
-    avatar: 'zhouxx',
-    accent: 'rose',
-  },
-  {
     id: 'hehe',
     name: '何何',
     tagline: '温和耐心的陪练老师',
