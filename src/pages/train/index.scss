@@ -194,11 +194,11 @@
 
     .meld-tile {
       width: 28px;
-      height: 38px;
+      height: 44px;
       margin-left: -2px;
-      border-radius: 3px;
+      border-radius: 4px;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-      background: #fff;
+      background: transparent;
 
       &:first-child {
         margin-left: 0;
@@ -208,14 +208,14 @@
 }
 
 .tile {
-  width: 72px;
-  height: 96px;
+  width: 70px;
+  height: 108px;
   border-radius: 10px;
   overflow: hidden;
   border: 3px solid transparent;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   transition: all 0.15s;
-  background: #fff;
+  background: transparent;
 
   &:active {
     transform: scale(0.93);
@@ -536,7 +536,7 @@
 
     .recommend-tile {
       width: 48px;
-      height: 64px;
+      height: 74px;
       margin-right: 8px;
       border-radius: 6px;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
