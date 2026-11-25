@@ -3,3 +3,7 @@ node_modules/
 .DS_Store
 *.local
 .swc
+video/node_modules/
+video/public/assets/
+video/public/audio/
+video/out/
