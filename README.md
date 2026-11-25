@@ -14,7 +14,8 @@
 
 ## 演示视频
 
-<!-- 上传视频后，将本行替换为 GitHub 生成的视频附件 URL，前后各留一个空行。 -->
+https://github.com/user-attachments/assets/bfecde2a-7c81-42bb-9f2e-6c2ccdb7c0ee
+
 
 ## 技术栈
 
