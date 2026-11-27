@@ -4,6 +4,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const venueAction = require('./venue-actions.js')
 const routeExtra = require('./table-directory.js')
+const { mirrorStored, seedTable, safe } = require('./solo-mirror.js')
 const TABLE_ID = 'fixed-four'
 const NAMES = ['HENING', 'WUYU', 'TANGXIANG', 'DUHAN']
 const REASONS = ['greedy', 'aggressive', 'defense', 'discard', 'riichi_choice', 'luck']
@@ -58,7 +59,7 @@ exports.main = async (event = {}) => {
     if (event.action === 'status') return statusOf(table, OPENID)
     if (event.action === 'claim' || event.action === 'release') {
       if (!NAMES.includes(event.playerName)) return fail('INVALID', '请选择固定四人中的一位')
-      return await db.runTransaction(async (transaction) => {
+      const claimed = await db.runTransaction(async (transaction) => {
         const ref = transaction.collection('match_tables').doc(TABLE_ID)
         const current = await readDoc(ref)
         if (!current?.ready) return fail('NOT_READY', '牌桌正在升级')
@@ -76,6 +77,11 @@ exports.main = async (event = {}) => {
         await ref.update({ data: { members: current.members, updatedAt: db.serverDate() } })
         return statusOf(current, OPENID)
       })
+      if (event.action === 'claim' && claimed?.ok) {
+        const latest = await readDoc(tableRef)
+        if (latest?.ready) await safe(() => seedTable({ db, readDoc, hash, pages, table: latest, tableId: TABLE_ID }))
+      }
+      return claimed
     }
     if (!identity || event.bindingId !== identity.bindingId) return fail('UNBOUND', '请先认领自己的身份')
     const venueResult = await venueAction({ event, db, tableId: TABLE_ID, openid: OPENID, readDoc, memberOf })
@@ -104,7 +110,7 @@ exports.main = async (event = {}) => {
         || players.some((p) => !p || !NAMES.includes(p.name) || !Number.isFinite(p.scoreDelta))
         || Math.abs(players.reduce((sum, p) => sum + p.scoreDelta, 0)) > 1e-6) return fail('INVALID', '四人积分必须完整且合计为零')
     }
-    return await db.runTransaction(async (transaction) => {
+    const saved = await db.runTransaction(async (transaction) => {
       // 与认领/解除共用事务读取，防止权限撤销时写入仍成功。
       const currentTable = await readDoc(transaction.collection('match_tables').doc(TABLE_ID))
       const currentIdentity = memberOf(currentTable, OPENID)
@@ -142,6 +148,8 @@ exports.main = async (event = {}) => {
         updatedAt: now } })
       return { ok: true, revision, updatedAt: now }
     })
+    if (saved?.ok) await safe(async () => mirrorStored({ db, readDoc, hash, table: await readDoc(tableRef), tableId: TABLE_ID, matchId: event.id }))
+    return saved
   } catch (error) {
     console.error('[matchTable]', error)
     return fail('SERVER_ERROR', '暂时无法连接牌桌，请稍后重试')

@@ -22,7 +22,6 @@ import {
 } from '../../core/match-service'
 import {
   PERFORMANCE_OPTIONS,
-  SOLO_SEATS,
   FIXED_MATCH_PLAYERS,
   PLAYER_AVATAR_COLORS,
   REASON_OPTIONS,
@@ -30,7 +29,6 @@ import {
   SELF_PLAYER_NAME,
   type MatchPerformance,
   type MatchReason,
-  type SoloSeat,
   type MatchVariant,
 } from '../../core/match-types'
 
@@ -505,8 +503,7 @@ function SoloRecordEditor({ route }: { route: { id?: string; draft?: string } })
   const [loadedRevision, setLoadedRevision] = useState<number>()
   const [dayOptions, setDayOptions] = useState(() => buildDayOptions())
   const [playedAt, setPlayedAt] = useState(Date.now())
-  const [location, setLocation] = useState('家庭局')
-  const [seat, setSeat] = useState<SoloSeat | undefined>()
+  const [location, setLocation] = useState('')
   const [score, setScore] = useState('')
   const [performance, setPerformance] = useState<MatchPerformance | undefined>('good')
   const [reasons, setReasons] = useState<MatchReason[]>([])
@@ -534,8 +531,7 @@ function SoloRecordEditor({ route }: { route: { id?: string; draft?: string } })
       setLoadedRevision(record?.revision)
       setPlayedAt(source?.playedAt || Date.now())
       if (source) setDayOptions(buildDayOptions(source.playedAt))
-      setLocation(source?.location || '家庭局')
-      setSeat(source?.seat)
+      setLocation(source?.location || '')
       setScore(source ? String(source.scoreDelta) : '')
       setPerformance(source?.performance)
       setReasons(source?.reasons || [])
@@ -564,7 +560,7 @@ function SoloRecordEditor({ route }: { route: { id?: string; draft?: string } })
     }
     setSaving(true)
     try {
-      upsertSoloMatch({ id: editId, revision: loadedRevision, playedAt, scoreDelta: delta, location, seat, note, performance, reasons })
+      upsertSoloMatch({ id: editId, revision: loadedRevision, playedAt, scoreDelta: delta, location, note, performance, reasons })
       if (route.draft && route.id) discardSoloConflict(route.id)
       Taro.showToast({ title: '已保存，正在同步云端', icon: 'success' })
       setTimeout(() => Taro.navigateBack(), 400)
@@ -598,14 +594,12 @@ function SoloRecordEditor({ route }: { route: { id?: string; draft?: string } })
         }}>
           <View className="basic-col"><Text className="basic-label">日期</Text><Text className="basic-value">{formatDisplayTime(playedAt)}</Text></View>
         </Picker>
-        <Input className="basic-input" value={location} placeholder="家庭局" onInput={(event) => setLocation(event.detail.value)} />
+        <Input className="basic-input" value={location} placeholder="哪家棋牌室" onInput={(event) => setLocation(event.detail.value)} />
         {!!locations.length && <View className="chip-row">{locations.slice(0, 4).map((item) => <Text key={item} className="chip" onClick={() => setLocation(item)}>{item}</Text>)}</View>}
       </View>
       <View className="section-card">
         <View className="section-head"><BarChartOutlined size={18} color={BRAND} /><Text className="section-title">我的分数</Text></View>
         <Input className={`player-delta ${deltaClass}`} type="text" value={score} placeholder="0分" onInput={(event) => setScore(event.detail.value.replace(/[^\d.-]/g, ''))} />
-        <Text className="sub-label">这一场坐在哪一方</Text>
-        <View className="seat-picker">{SOLO_SEATS.map((item) => <Text key={item.value} className={`seat-choice ${seat === item.value ? 'active' : ''}`} onClick={() => setSeat(seat === item.value ? undefined : item.value)}>{item.label}</Text>)}</View>
       </View>
       <View className="section-card">
         <Text className="sub-label">你的表现如何？</Text>

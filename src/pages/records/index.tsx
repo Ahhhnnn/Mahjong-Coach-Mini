@@ -14,10 +14,10 @@ import {
   computeMatchStats, filterBySeason, getMatchSeasonAt, MATCH_SEASON_OPTIONS,
   type MatchSeason, type MatchSeasonPeriod,
 } from '../../core/match-stats-service'
-import { formatDelta, soloSeatLabel, SOLO_SELF_NAME, soloToMatchRecord } from '../../core/match-types'
-import { computeSoloSeatMystic } from '../../core/solo-mystic-service'
+import { formatDelta, parseTableSoloId, SOLO_SELF_NAME, soloToMatchRecord } from '../../core/match-types'
+import { computeSoloVenueMystic } from '../../core/solo-mystic-service'
 import { MYSTIC_MIN_GAMES } from '../../core/match-mystic-service'
-import { listCachedTables, listMyTables, tableContext, TABLES_CHANGED, type TableSummary } from '../../core/table-directory-service'
+import { listMyTables, listVisibleTables, seedPersonalScores, tableContext, TABLES_CHANGED, type TableSummary } from '../../core/table-directory-service'
 import './index.scss'
 
 type Lens = 'solo' | 'four'
@@ -33,7 +33,7 @@ export default function RecordsPage() {
   const followCurrentSeason = useRef(true)
   const [soloRecords, setSoloRecords] = useState(listSoloMatches)
   const [badges, setBadges] = useState(() => updateSoloBadges(listSoloMatches()))
-  const [tables, setTables] = useState<TableSummary[]>(listCachedTables)
+  const [tables, setTables] = useState<TableSummary[]>(listVisibleTables)
   const [expanded, setExpanded] = useState(false)
   const [loggingIn, setLoggingIn] = useState(false)
   const scope = soloScope(openid)
@@ -43,7 +43,7 @@ export default function RecordsPage() {
     const records = listSoloMatches()
     setSoloRecords(records)
     setBadges(current ? updateSoloBadges(records) : [])
-    setTables(listCachedTables())
+    setTables(listVisibleTables())
     setSyncState(getSoloSyncState())
   }
   const chooseLens = (next: Lens) => {
@@ -57,9 +57,9 @@ export default function RecordsPage() {
     if (followCurrentSeason.current) setSeason(current)
     refresh()
     if (getCachedUser()?.openid) {
-      void syncCloudSoloToLocal().then(refresh)
-      void listMyTables().then(async (next) => {
-        setTables(next)
+      void seedPersonalScores().catch(() => undefined).then(() => syncCloudSoloToLocal()).then(refresh)
+      void listMyTables().then(async () => {
+        setTables(listVisibleTables())
         await Promise.all(next.map((table) => syncCloudMatchesToLocal(table.id === 'fixed-four' ? undefined : tableContext(table))))
         refresh()
       }).catch(() => { /* 离线继续看本地桌子和单人缓存 */ })
@@ -81,7 +81,7 @@ export default function RecordsPage() {
   const soloMatches = useMemo(() => soloRecords.map(soloToMatchRecord), [soloRecords])
   const stats = useMemo(() => computeMatchStats(soloMatches, { season, playerName: SOLO_SELF_NAME, seats: [SOLO_SELF_NAME] }), [soloMatches, season])
   const filtered = useMemo(() => filterBySeason(soloMatches, season), [soloMatches, season])
-  const seatMystic = useMemo(() => computeSoloSeatMystic(soloRecords, season), [soloRecords, season])
+  const venueMystic = useMemo(() => computeSoloVenueMystic(soloRecords, season), [soloRecords, season])
   const years = useMemo(() => Array.from(new Set([
     currentSeason.year, season.year,
     ...soloRecords.map((record) => getMatchSeasonAt(record.playedAt).year).filter(Number.isFinite),
@@ -103,6 +103,12 @@ export default function RecordsPage() {
     } finally { setLoggingIn(false) }
   }
   const goSoloEdit = (id?: string) => Taro.navigateTo({ url: id ? `/pages/record-edit/index?mode=solo&id=${id}` : '/pages/record-edit/index?mode=solo' })
+  const openRecord = (id: string) => {
+    const parsed = parseTableSoloId(id)
+    if (!parsed) { goSoloEdit(id); return }
+    const tableQuery = parsed.tableId === 'fixed-four' ? '' : `&tableId=${encodeURIComponent(parsed.tableId)}`
+    Taro.navigateTo({ url: `/pages/record-edit/index?id=${encodeURIComponent(parsed.matchId)}${tableQuery}` })
+  }
   const seasonOption = MATCH_SEASON_OPTIONS.find((option) => option.value === season.period)!
   const seasonLabel = `${season.year} ${seasonOption.label}${season.period === 'all' ? '' : ' 赛季'}`
   const isCurrentSeason = season.year === currentSeason.year && season.period === currentSeason.period
@@ -169,24 +175,24 @@ export default function RecordsPage() {
           )}
         </View>
         <View className="section-card">
-          <View className="section-head"><Text className="section-title">位置玄学</Text><Text className="ranking-scope">{seasonLabel} · 胜率</Text></View>
-          <Text className="records-empty-text">{seatMystic.luckySeats.length ? `顺位 ${seatMystic.seats.filter((seat) => seatMystic.luckySeats.includes(seat.seat)).map((seat) => seat.label).join('、')}` : `满 ${MYSTIC_MIN_GAMES} 场后，场均正分最高的方位记为顺位`}</Text>
-          {seatMystic.seats.map((seat) => <View key={seat.seat} className="seat-row">
-            <Text className="seat-label">{seat.label}</Text>
+          <View className="section-head"><Text className="section-title">棋牌室玄学</Text><Text className="ranking-scope">{seasonLabel} · 胜率</Text></View>
+          <Text className="records-empty-text">{venueMystic.luckyVenues.length ? `福地 ${venueMystic.luckyVenues.join('、')}` : `填上棋牌室，满 ${MYSTIC_MIN_GAMES} 场后标出胜率最高的福地`}</Text>
+          {!venueMystic.venues.length && <Text className="trend-hint">还没有可比较的棋牌室。</Text>}
+          {venueMystic.venues.map((venue) => <View key={venue.name} className="seat-row">
             <View className="seat-main">
-              <Text className="seat-rate">{seat.games ? `胜率 ${seat.winRate}%` : '还没坐过'}</Text>
-              <Text className="seat-meta">{seat.games ? `${seat.games} 场 · ${seat.wins}胜${seat.losses}负` : '记分时选这个方位'}</Text>
+              <Text className="seat-rate">{venue.name}</Text>
+              <Text className="seat-meta">{venue.wins + venue.losses ? `胜率 ${venue.winRate}% · ${venue.games} 场 · ${venue.wins}胜${venue.losses}负` : `${venue.games} 场 · 还没分出胜负`}</Text>
             </View>
             <View className="seat-side">
-              <Text className={`seat-total ${seat.total >= 0 ? 'pos' : 'neg'}`}>{seat.games ? formatDelta(seat.total) : ''}</Text>
-              {seatMystic.luckySeats.includes(seat.seat) && <Text className="seat-tag lucky">顺位</Text>}
-              {seatMystic.unluckySeats.includes(seat.seat) && <Text className="seat-tag unlucky">背位</Text>}
-              {!!seat.games && !seat.eligible && <Text className="seat-tag">待观察</Text>}
+              <Text className={`seat-total ${venue.total >= 0 ? 'pos' : 'neg'}`}>{formatDelta(venue.total)}</Text>
+              {venueMystic.luckyVenues.includes(venue.name) && <Text className="seat-tag lucky">福地</Text>}
+              {venueMystic.unluckyVenues.includes(venue.name) && <Text className="seat-tag unlucky">雷区</Text>}
+              {!venue.eligible && <Text className="seat-tag">待观察</Text>}
             </View>
           </View>)}
-          <Text className="trend-hint">未选方位的 {seatMystic.games - seatMystic.seatedGames} 场只计入总积分。顺位、背位至少 {MYSTIC_MIN_GAMES} 场。</Text>
+          <Text className="trend-hint">没填棋牌室的 {venueMystic.games - venueMystic.placedGames} 场只计入总积分。胜率不含平局，福地和雷区至少 {MYSTIC_MIN_GAMES} 场。</Text>
         </View>
-        {!!badges.length && <MatchBadgeWall key={scope} badges={badges} playerName={SOLO_SELF_NAME} ledgerKey={soloLedgerKey(openid)} title="单人荣誉" intro="只按你自己的分数累计，不和四人牌桌混在一起" />}
+        {!!badges.length && <MatchBadgeWall key={scope} badges={badges} playerName={SOLO_SELF_NAME} ledgerKey={soloLedgerKey(openid)} title="单人荣誉" intro="按你自己的分数累计。四人牌局里你的分数也会记进这里" />}
         <View className="section-card section-card-last">
           <View className="section-head"><Text className="section-title">单人足迹</Text><Text className="ranking-scope">{seasonOption.label} · 共 {filtered.length} 场</Text></View>
           {!filtered.length && <View className="records-list-empty"><Text className="records-empty-text">{seasonLabel}暂无单人记录</Text><Button color="primary" shape="round" onClick={() => goSoloEdit()}>记一场分数</Button></View>}
@@ -195,8 +201,8 @@ export default function RecordsPage() {
             const delta = source?.scoreDelta || 0
             const date = new Date(match.playedAt)
             const dateStr = `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-            return <View key={match.id} className="match-row" onClick={() => goSoloEdit(match.id)}>
-              <View className="match-main"><Text className="match-date">{dateStr}</Text><Text className="match-meta">{[soloSeatLabel(source?.seat), match.location || '未填地点'].filter(Boolean).join(' · ')}</Text>{match.note && <Text className="match-note">{match.note}</Text>}</View>
+            return <View key={match.id} className="match-row" onClick={() => openRecord(match.id)}>
+              <View className="match-main"><Text className="match-date">{dateStr}</Text><Text className="match-meta">{[source?.origin === 'table' ? '四人牌局' : '', match.location || '未填棋牌室'].filter(Boolean).join(' · ')}</Text>{match.note && <Text className="match-note">{match.note}</Text>}</View>
               <View className="match-right"><Text className={`match-result ${match.result === 'win' ? 'win' : match.result === 'loss' ? 'loss' : ''}`}>{match.result === 'win' ? '胜' : match.result === 'loss' ? '负' : '平'}</Text><Text className={`match-delta ${delta >= 0 ? 'pos' : 'neg'}`}>{formatDelta(delta)}</Text></View>
             </View>
           })}

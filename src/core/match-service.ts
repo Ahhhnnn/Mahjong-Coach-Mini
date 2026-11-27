@@ -100,6 +100,14 @@ export function listMatches(ctx?: TablePlayContext): MatchRecord[] {
   const source = resolve(ctx)
   return source ? accept(read(source).records, source).sort(compareMatchesByTime) : []
 }
+/** 只读已有缓存。缓存还没建立时不创建空记录，避免冲掉旧草稿导入。 */
+export function peekMatches(ctx?: TablePlayContext): { ready: boolean; records: MatchRecord[] } {
+  const source = resolve(ctx)
+  if (!source?.scope) return { ready: false, records: [] }
+  const raw = Taro.getStorageSync(source.scope)
+  if (!raw?.records || !raw.pending || !Array.isArray(raw.conflicts)) return { ready: false, records: [] }
+  return { ready: true, records: accept(raw.records, source) }
+}
 export function getMatch(id: string, ctx?: TablePlayContext): MatchRecord | undefined {
   return listMatches(ctx).find((record) => record.id === id)
 }

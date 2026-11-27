@@ -23,8 +23,11 @@ async function pages(openid) {
   }
 }
 function publicRecord(record) {
-  const { id, playedAt, variant, settleUnit, scoreDelta, location, seat, note, performance, reasons, createdAt, updatedAt, revision } = record
-  return { id, playedAt, variant, settleUnit, scoreDelta, location, seat: SEATS.includes(seat) ? seat : '', note, performance, reasons, createdAt, updatedAt, revision }
+  const { id, playedAt, variant, settleUnit, scoreDelta, location, seat, note, performance, reasons, createdAt, updatedAt, revision, source, sourceTableId } = record
+  return {
+    id, playedAt, variant, settleUnit, scoreDelta, location, seat: SEATS.includes(seat) ? seat : '', note, performance, reasons, createdAt, updatedAt, revision,
+    source: source === 'table' ? 'table' : '', sourceTableId: typeof sourceTableId === 'string' ? sourceTableId : '',
+  }
 }
 
 // 单人分数只属于当前 openid。本地缓存可以丢，云端文档是这份账本的正文。
@@ -47,6 +50,7 @@ exports.main = async (event = {}) => {
       || typeof event.mutationId !== 'string' || !event.mutationId || event.mutationId.length > 160) {
       return fail('INVALID', '记录版本信息无效，请刷新后重试')
     }
+    if (event.id.startsWith('tm:')) return fail('INVALID', '四人牌局的分数请在牌桌里修改')
     if (event.action === 'save' && (!Number.isFinite(event.playedAt) || event.playedAt <= 0
       || event.settleUnit !== 'score' || !Number.isFinite(event.scoreDelta))) {
       return fail('INVALID', '请输入有效的单人分数')

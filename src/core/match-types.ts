@@ -156,6 +156,19 @@ export function soloSeatLabel(seat?: SoloSeat): string {
   return SOLO_SEATS.find((item) => item.value === seat)?.label || ''
 }
 
+/** 四人牌局投影到个人账本时使用的稳定 ID，避免和手记的单人分数撞车。 */
+export function tableSoloId(tableId: string, matchId: string): string {
+  return `tm:${tableId}:${matchId}`
+}
+
+export function parseTableSoloId(id: string): { tableId: string; matchId: string } | undefined {
+  if (!id.startsWith('tm:')) return undefined
+  const rest = id.slice(3)
+  const index = rest.indexOf(':')
+  if (index <= 0 || index >= rest.length - 1) return undefined
+  return { tableId: rest.slice(0, index), matchId: rest.slice(index + 1) }
+}
+
 export interface SoloMatchRecord {
   id: string
   playedAt: number
@@ -172,6 +185,9 @@ export interface SoloMatchRecord {
   createdAt: number
   updatedAt: number
   revision?: number
+  /** 来自四人牌局的投影。分数以那张桌子为准。 */
+  origin?: 'table'
+  sourceTableId?: string
 }
 
 /** 单人记录转成仅含本人的牌局，便于复用赛季统计。 */

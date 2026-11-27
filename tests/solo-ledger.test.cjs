@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict')
 const { test } = require('node:test')
-const { load, client } = require('./helpers/table-harness.cjs')
+const { load, client, server, seeds, clone, hash } = require('./helpers/table-harness.cjs')
 
 function soloCloud() {
   let openid = 'owner'
@@ -85,23 +85,88 @@ test('单人徽章按自己的正负分计算，不看四人名次', () => {
   assert.equal(badges.find((badge) => badge.id === 'solo_sky').unlockedAt, undefined)
 })
 
-test('方位会写进云端，并按位置分别计算胜率和顺位', async () => {
-  const cloud = soloCloud()
-  assert.equal((await cloud.main({ ...record, seat: 'east' })).ok, true)
-  assert.equal((await cloud.main({ action: 'list' })).matches[0].seat, 'east')
-  assert.equal((await cloud.main({ ...record, id: 'bad-seat', mutationId: 'bad-seat', seat: '门口' })).ok, true)
-  assert.equal((await cloud.main({ action: 'list' })).matches.find((item) => item.id === 'bad-seat').seat, '')
+test('棋牌室按胜率汇总，平局不计入胜负，没填地点不进玄学', async () => {
   const mystic = client(async () => ({ result: { ok: false } })).load('src/core/solo-mystic-service')
-  const game = (id, seat, score) => ({ id, playedAt: id, settleUnit: 'score', scoreDelta: score, seat })
-  const east = Array.from({ length: 5 }, (_, index) => game(index + 1, 'east', 10))
-  const south = Array.from({ length: 5 }, (_, index) => game(index + 10, 'south', -4))
-  const stats = mystic.computeSoloSeatMystic([...east, ...south, game(20, undefined, 100)])
-  assert.equal(stats.seats.find((seat) => seat.seat === 'east').winRate, 100)
-  assert.equal(stats.seats.find((seat) => seat.seat === 'south').winRate, 0)
-  assert.deepEqual(stats.luckySeats, ['east'])
-  assert.deepEqual(stats.unluckySeats, ['south'])
-  assert.equal(stats.seatedGames, 10)
-  assert.equal(stats.games, 11)
+  const game = (id, location, score) => ({ id, playedAt: id, settleUnit: 'score', scoreDelta: score, location })
+  const lucky = [10, 8, 6, 4, 0].map((score, index) => game(index + 1, '如意棋牌', score))
+  const unlucky = [-2, -4, -6, -8, -10].map((score, index) => game(index + 10, '巷口棋牌', score))
+  const stats = mystic.computeSoloVenueMystic([...lucky, ...unlucky, game(20, '  如意棋牌  ', 2), game(21, '', 100)])
+  const home = stats.venues.find((venue) => venue.name === '如意棋牌')
+  const alley = stats.venues.find((venue) => venue.name === '巷口棋牌')
+  assert.equal(home.games, 6)
+  assert.equal(home.winRate, 100)
+  assert.equal(alley.winRate, 0)
+  assert.deepEqual(stats.luckyVenues, ['如意棋牌'])
+  assert.deepEqual(stats.unluckyVenues, ['巷口棋牌'])
+  assert.equal(stats.placedGames, 11)
+  assert.equal(stats.games, 12)
+  assert.equal(mystic.computeSoloVenueMystic([game(1, '新店', 1)]).venues[0].eligible, false)
+})
+
+test('现有四人牌局按每人分数初始化个人页，之后的四人记分也同步过去', async () => {
+  const cloud = server()
+  cloud.seed()
+  for (const name of ['WUYU', 'TANGXIANG', 'DUHAN']) cloud.bind(name)
+  const before = clone([...cloud.documents.values()])
+  const tableBefore = clone(cloud.tables.get('fixed-four'))
+  const seeded = await cloud.main({ schemaVersion: 2, action: 'seedSolo' })
+  assert.equal(seeded.ok, true)
+  assert.equal(seeded.mirrored, seeds.length * 4)
+  assert.deepEqual([...cloud.documents.values()], before)
+  assert.deepEqual(cloud.tables.get('fixed-four'), tableBefore)
+  const solos = () => [...cloud.collections.get('solo_matches').values()]
+  assert.equal(solos().length, seeds.length * 4)
+  const sample = seeds[0]
+  for (const name of ['HENING', 'WUYU', 'TANGXIANG', 'DUHAN']) {
+    const mine = solos().find((item) => item.sourceMatchId === sample.id && item.ownerOpenid === (name === 'HENING' ? 'owner' : name.toLowerCase()))
+    assert.equal(mine.scoreDelta, sample.players.find((player) => player.name === name).scoreDelta)
+    assert.equal(mine.id, `tm:fixed-four:${sample.id}`)
+  }
+  const writes = cloud.writes.length
+  assert.equal((await cloud.main({ schemaVersion: 2, action: 'seedSolo' })).mirrored, 0)
+  assert.equal(cloud.writes.length, writes)
+  cloud.setOwner('stranger')
+  assert.equal((await cloud.main({ schemaVersion: 2, action: 'seedSolo' })).mirrored, 0)
+  cloud.setOwner('owner')
+  const created = clone(seeds[0])
+  created.id = 'new-game'
+  created.revision = 0
+  created.mutationId = 'create-new-game'
+  created.players = created.players.map((player) => ({
+    ...player,
+    scoreDelta: player.name === 'HENING' ? 12 : player.name === 'WUYU' ? -4 : player.name === 'TANGXIANG' ? -3 : -5,
+  }))
+  assert.equal((await cloud.request({ action: 'save', ...created })).ok, true)
+  assert.equal(solos().find((item) => item.sourceMatchId === 'new-game' && item.ownerOpenid === 'owner').scoreDelta, 12)
+  assert.equal(solos().find((item) => item.sourceMatchId === 'new-game' && item.ownerOpenid === 'wuyu').scoreDelta, -4)
+  assert.deepEqual(cloud.documents.get(hash(`fixed-four:${sample.id}`)), before.find((item) => item.id === sample.id))
+  created.revision = 1
+  created.mutationId = 'edit-new-game'
+  created.players = created.players.map((player) => ({ ...player, scoreDelta: player.name === 'HENING' ? 20 : player.name === 'WUYU' ? -8 : player.name === 'TANGXIANG' ? -6 : -6 }))
+  assert.equal((await cloud.request({ action: 'save', ...created })).ok, true)
+  assert.equal(solos().find((item) => item.sourceMatchId === 'new-game' && item.ownerOpenid === 'owner').scoreDelta, 20)
+  assert.equal((await cloud.request({ action: 'remove', id: 'new-game', revision: 2, mutationId: 'remove-new-game' })).ok, true)
+  assert.ok(solos().filter((item) => item.sourceMatchId === 'new-game').every((item) => item._deleted))
+  assert.equal(cloud.documents.get(hash(`fixed-four:${sample.id}`)).revision, 1)
+  const local = client(async ({ data }) => ({ result: await cloud.main(data) }))
+  await local.service.syncCloudMatchesToLocal()
+  const solo = local.load('src/core/solo-match-service')
+  const types = local.load('src/core/match-types')
+  const directory = local.load('src/core/table-directory-service')
+  assert.equal(directory.listVisibleTables()[0].id, 'fixed-four')
+  assert.equal(directory.listVisibleTables()[0].name, '常聚牌桌')
+  assert.equal(directory.findVisibleTable('fixed-four')?.mySeat, 'HENING')
+  local.storage.delete(`table_directory_v1:${JSON.parse(local.storage.get('user_info')).openid}`)
+  assert.equal(directory.findVisibleTable('fixed-four')?.name, '常聚牌桌')
+  assert.equal(local.service.listMatches().length, seeds.length)
+  const projected = solo.listSoloMatches()
+  assert.equal(projected.length, seeds.length)
+  const first = local.service.listMatches()[0]
+  assert.equal(projected.find((item) => item.id === types.tableSoloId('fixed-four', first.id)).scoreDelta, first.players.find((player) => player.isSelf).scoreDelta)
+  solo.upsertSoloMatch({ playedAt: Date.UTC(2026, 1, 2), scoreDelta: 3, location: '独自' })
+  assert.equal(solo.listSoloMatches().length, seeds.length + 1)
+  assert.throws(() => solo.removeSoloMatch(types.tableSoloId('fixed-four', first.id)), /四人牌局/)
+  assert.equal(local.service.listMatches().length, seeds.length)
 })
 
 test('建桌座位名不能空、不能重复，单人分数不必和其他人合计为零', () => {

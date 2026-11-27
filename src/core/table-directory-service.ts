@@ -1,5 +1,5 @@
 import Taro from '@tarojs/taro'
-import { cacheUser, getCachedUser } from './table-identity-service'
+import { cacheUser, getCachedUser, getTableIdentity } from './table-identity-service'
 import { FIXED_MATCH_PLAYERS, type PlayerName, type TablePlayContext } from './match-types'
 
 export interface TableSummary {
@@ -31,6 +31,29 @@ export function listCachedTables(): TableSummary[] {
   if (!key) return []
   const raw = Taro.getStorageSync(key)
   return Array.isArray(raw) ? raw : []
+}
+
+/** 云端桌子名单还没回来时，已认领的常聚牌桌也要先显示出来。 */
+export function listVisibleTables(): TableSummary[] {
+  const cached = listCachedTables()
+  const identity = getTableIdentity()
+  const tables = identity && !cached.some((table) => table.id === 'fixed-four')
+    ? [{
+      id: 'fixed-four', name: '常聚牌桌', seats: [...FIXED_MATCH_PLAYERS], mySeat: identity.playerName,
+      role: identity.role, bindingId: identity.bindingId,
+      players: FIXED_MATCH_PLAYERS.map((name) => ({ name, claimed: name === identity.playerName })),
+    }, ...cached]
+    : cached
+  return [...tables].sort((a, b) => Number(b.id === 'fixed-four') - Number(a.id === 'fixed-four'))
+}
+
+export function findVisibleTable(id: string): TableSummary | undefined {
+  return listVisibleTables().find((table) => table.id === id)
+}
+
+export async function seedPersonalScores() {
+  if (!getCachedUser()?.openid) return
+  await call('seedSolo')
 }
 
 function store(tables: TableSummary[]) {

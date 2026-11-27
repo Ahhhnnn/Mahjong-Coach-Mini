@@ -2,7 +2,8 @@ const { randomBytes } = require('crypto')
 const TABLE_ID = 'fixed-four'
 const FIXED_NAMES = ['HENING', 'WUYU', 'TANGXIANG', 'DUHAN']
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-const DIRECTORY = new Set(['createTable', 'listTables', 'previewTable', 'claimSeat', 'releaseSeat', 'dissolveTable'])
+const { mirrorStored, seedTable, safe } = require('./solo-mirror.js')
+const DIRECTORY = new Set(['createTable', 'listTables', 'previewTable', 'claimSeat', 'releaseSeat', 'dissolveTable', 'seedSolo'])
 
 function cleanLabel(value, max) {
   if (typeof value !== 'string') return ''
@@ -69,6 +70,23 @@ async function handleDirectory({ event, db, openid, readDoc, fail, pages, hash }
     }
     return { ok: true, tables }
   }
+  if (event.action === 'seedSolo') {
+    let mirrored = 0
+    const fixed = await readDoc(db.collection('match_tables').doc(TABLE_ID))
+    if (fixed?.ready && memberOf(fixed, openid, FIXED_NAMES)) {
+      mirrored += await seedTable({ db, readDoc, hash, pages, table: fixed, tableId: TABLE_ID })
+    }
+    const memberships = await pages('table_memberships', { openid })
+    for (const membership of memberships) {
+      if (!membership?.tableId || membership.tableId === TABLE_ID) continue
+      const table = await readDoc(db.collection('match_tables').doc(membership.tableId))
+      if (!table?.ready || !Array.isArray(table.seats)) continue
+      const identity = memberOf({ ...table, id: membership.tableId }, openid, table.seats)
+      if (!identity || identity.bindingId !== membership.bindingId) continue
+      mirrored += await seedTable({ db, readDoc, hash, pages, table, tableId: membership.tableId })
+    }
+    return { ok: true, mirrored }
+  }
   if (event.action === 'previewTable') {
     const code = cleanLabel(event.inviteCode, 6).toUpperCase()
     if (code.length !== 6) return fail('INVALID', '请输入 6 位邀请码')
@@ -113,7 +131,7 @@ async function handleDirectory({ event, db, openid, readDoc, fail, pages, hash }
   }
   if (!['claimSeat', 'releaseSeat', 'dissolveTable'].includes(event.action)) return fail('INVALID', '未知操作')
   if (event.tableId === TABLE_ID || !event.tableId) return fail('INVALID', '常聚牌桌请到身份页认领')
-  return db.runTransaction(async (transaction) => {
+  const changed = await db.runTransaction(async (transaction) => {
     const ref = transaction.collection('match_tables').doc(event.tableId)
     const current = await readDoc(ref)
     if (!current?.ready || !Array.isArray(current.seats)) return fail('INVALID', '这张桌子不存在')
@@ -155,6 +173,11 @@ async function handleDirectory({ event, db, openid, readDoc, fail, pages, hash }
     if (previous?.openid) await transaction.collection('table_memberships').doc(hash(`${previous.openid}:${event.tableId}`)).remove()
     return { ok: true, table: summary({ ...current, id: event.tableId, members }, mine) }
   })
+  if (event.action === 'claimSeat' && changed?.ok) {
+    const latest = await readDoc(db.collection('match_tables').doc(event.tableId))
+    if (latest?.ready) await safe(() => seedTable({ db, readDoc, hash, pages, table: latest, tableId: event.tableId }))
+  }
+  return changed
 }
 
 async function handleCustomMatch({ event, db, openid, readDoc, fail, pages, hash, REASONS }) {
@@ -190,7 +213,7 @@ async function handleCustomMatch({ event, db, openid, readDoc, fail, pages, hash
       return fail('INVALID', '四人积分必须完整且合计为零')
     }
   }
-  return db.runTransaction(async (transaction) => {
+  const result = await db.runTransaction(async (transaction) => {
     const current = await readDoc(transaction.collection('match_tables').doc(event.tableId))
     const currentIdentity = memberOf({ ...current, id: event.tableId }, openid, current?.seats || [])
     if (!current?.ready || currentIdentity?.bindingId !== identity.bindingId) return fail('UNBOUND', '座位已解除，请重新认领')
@@ -229,6 +252,8 @@ async function handleCustomMatch({ event, db, openid, readDoc, fail, pages, hash
     } })
     return { ok: true, revision, updatedAt: now }
   })
+  if (result?.ok) await safe(() => mirrorStored({ db, readDoc, hash, table, tableId: event.tableId, matchId: event.id }))
+  return result
 }
 
 module.exports = async function routeExtra(context) {

@@ -1,8 +1,9 @@
 import Taro from '@tarojs/taro'
 import { updateSoloBadges } from './solo-badge-service'
+import { soloRecordsFromTables } from './solo-from-table'
 import { getCachedUser } from './table-identity-service'
 import {
-  deriveMatchResult, isSoloSeat, makeMatchId, type MatchPerformance, type MatchReason, type SoloMatchRecord, type SoloSeat,
+  deriveMatchResult, isSoloSeat, makeMatchId, parseTableSoloId, type MatchPerformance, type MatchReason, type SoloMatchRecord, type SoloSeat,
 } from './match-types'
 
 interface Pending { kind: 'save' | 'remove'; revision: number; mutationId: string; base?: SoloMatchRecord }
@@ -34,18 +35,21 @@ function write(cache: Cache, scope = soloScope()) {
   Taro.eventCenter?.trigger(SOLO_CHANGED)
 }
 
-function accept(record: SoloMatchRecord): SoloMatchRecord | undefined {
+function accept(record: SoloMatchRecord & { source?: string }): SoloMatchRecord | undefined {
   if (!record || record.settleUnit !== 'score' || !Number.isFinite(record.playedAt) || record.playedAt <= 0) return undefined
   if (!Number.isFinite(record.scoreDelta)) return undefined
   const seat = isSoloSeat(record.seat) ? record.seat : undefined
-  return { ...record, seat, result: deriveMatchResult(record.scoreDelta), settleUnit: 'score', variant: record.variant || 'xuezhan' }
+  const origin = record.origin === 'table' || record.source === 'table' ? 'table' as const : undefined
+  const sourceTableId = typeof record.sourceTableId === 'string' && record.sourceTableId ? record.sourceTableId : undefined
+  return { ...record, seat, result: deriveMatchResult(record.scoreDelta), settleUnit: 'score', variant: record.variant || 'xuezhan', origin, sourceTableId }
 }
 
 export function listSoloMatches(): SoloMatchRecord[] {
-  return read().records.flatMap((record) => {
+  const stored = read().records.flatMap((record) => {
     const next = accept(record)
     return next ? [next] : []
   })
+  return soloRecordsFromTables(stored).sort((a, b) => a.playedAt - b.playedAt || a.id.localeCompare(b.id))
 }
 
 export function getSoloMatch(id: string): SoloMatchRecord | undefined {
@@ -78,6 +82,10 @@ function requestSync() {
   void syncCloudSoloToLocal()
 }
 
+function rejectMirrored(id?: string) {
+  if (id && parseTableSoloId(id)) throw new Error('这场分数来自四人牌局，请到对应桌子里修改')
+}
+
 export function upsertSoloMatch(input: {
   id?: string
   playedAt: number
@@ -91,6 +99,7 @@ export function upsertSoloMatch(input: {
   createdAt?: number
 }): SoloMatchRecord {
   if (!soloScope()) throw new Error('请先微信登录')
+  rejectMirrored(input.id)
   if (!Number.isFinite(input.playedAt) || input.playedAt <= 0 || !Number.isFinite(input.scoreDelta)) throw new Error('请输入有效的时间和分数')
   const cache = read()
   const existing = input.id ? getSoloMatch(input.id) : undefined
@@ -120,6 +129,7 @@ export function upsertSoloMatch(input: {
 
 export function removeSoloMatch(id: string, revision?: number) {
   if (!soloScope()) throw new Error('请先微信登录')
+  rejectMirrored(id)
   const cache = read()
   const existing = getSoloMatch(id)
   if (!existing) throw new Error('这场记录已不存在')
