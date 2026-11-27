@@ -17,15 +17,13 @@ import {
 
 import type { DiscardPuzzle } from '../../content/types'
 import { getCachedPuzzles, loadPuzzles } from '../../core/puzzle-service'
-import { isLoggedIn, syncCloudRecordsToLocal } from '../../core/auth'
+import { getCachedUser, isLoggedIn, syncCloudRecordsToLocal } from '../../core/auth'
 import { computeTrainStats, type TrainStats } from '../../core/train-stats-service'
 import { loadMistakes } from '../../core/mistake-service'
 import { listFavorites } from '../../core/favorite-service'
-import { listMatches, MATCHES_CHANGED } from '../../core/match-service'
+import { listSoloMatches, SOLO_CHANGED, soloScope } from '../../core/solo-match-service'
 import { computeMatchStats } from '../../core/match-stats-service'
-import { formatDelta } from '../../core/match-types'
-import { getTableIdentity, identityScope } from '../../core/table-identity-service'
-import { useTableIdentity } from '../../hooks/use-table-identity'
+import { formatDelta, SOLO_SELF_NAME, soloToMatchRecord } from '../../core/match-types'
 
 import headerBanner from '../../assets/home/header-banner.jpg'
 import coachBanner from '../../assets/home/coach-banner.jpg'
@@ -51,23 +49,24 @@ const emptyStats: TrainStats = {
 }
 
 export default function DashboardPage() {
-  const { scope } = useTableIdentity()
   const [puzzles, setPuzzles] = useState<DiscardPuzzle[]>(getCachedPuzzles())
   const [stats, setStats] = useState<TrainStats>(emptyStats)
   const [mistakeCount, setMistakeCount] = useState(0)
   const [favoriteCount, setFavoriteCount] = useState(0)
+  const openid = getCachedUser()?.openid || ''
   const [storedMatchBrief, setMatchBrief] = useState({ scope: '', total: 0, winRate: 0, cumText: '+0分' })
-  const matchBrief = storedMatchBrief.scope === scope ? storedMatchBrief : { total: 0, winRate: 0, cumText: '+0分' }
+  const matchBrief = soloScope(openid) && storedMatchBrief.scope === soloScope(openid) ? storedMatchBrief : { total: 0, winRate: 0, cumText: '+0分' }
   const refreshMatchBrief = () => {
-    const ms = computeMatchStats(listMatches(), { range: 'month', playerName: getTableIdentity()?.playerName })
-    setMatchBrief({ scope: identityScope(), total: ms.total, winRate: ms.winRate, cumText: formatDelta(ms.cumulative) })
+    const current = getCachedUser()?.openid || ''
+    const ms = computeMatchStats(listSoloMatches().map(soloToMatchRecord), { range: 'month', playerName: SOLO_SELF_NAME, seats: [SOLO_SELF_NAME] })
+    setMatchBrief({ scope: soloScope(current), total: ms.total, winRate: ms.winRate, cumText: formatDelta(ms.cumulative) })
   }
 
   useEffect(() => {
     refreshMatchBrief()
-    Taro.eventCenter.on(MATCHES_CHANGED, refreshMatchBrief)
-    return () => { Taro.eventCenter.off(MATCHES_CHANGED, refreshMatchBrief) }
-  }, [scope])
+    Taro.eventCenter.on(SOLO_CHANGED, refreshMatchBrief)
+    return () => { Taro.eventCenter.off(SOLO_CHANGED, refreshMatchBrief) }
+  }, [openid])
 
   useDidShow(() => {
     const refresh = (list = getCachedPuzzles()) => {
@@ -92,7 +91,7 @@ export default function DashboardPage() {
   const goBasic = () => Taro.navigateTo({ url: '/pages/basic/index' })
   const goReport = () => Taro.switchTab({ url: '/pages/report/index' })
   const goRecords = () => Taro.switchTab({ url: '/pages/records/index' })
-  const goRecordEdit = () => Taro.navigateTo({ url: '/pages/record-edit/index' })
+  const goRecordEdit = () => Taro.navigateTo({ url: '/pages/record-edit/index?mode=solo' })
   const puzzleTotal = Math.max(puzzles.length, 1)
   const basicProgress = Math.min(100, (stats.donePuzzles / puzzleTotal) * 100)
   const levelProgress = (stats.levelXp / stats.levelXpMax) * 100

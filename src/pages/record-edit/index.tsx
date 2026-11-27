@@ -22,6 +22,7 @@ import {
 } from '../../core/match-service'
 import {
   PERFORMANCE_OPTIONS,
+  SOLO_SEATS,
   FIXED_MATCH_PLAYERS,
   PLAYER_AVATAR_COLORS,
   REASON_OPTIONS,
@@ -29,12 +30,19 @@ import {
   SELF_PLAYER_NAME,
   type MatchPerformance,
   type MatchReason,
+  type SoloSeat,
   type MatchVariant,
 } from '../../core/match-types'
 
 import { useTableIdentity } from '../../hooks/use-table-identity'
+import { getCachedUser } from '../../core/table-identity-service'
 import { identityScope } from '../../core/table-identity-service'
 import TableIdentityGate from '../../components/table-identity-gate'
+import { ensureLogin } from '../../core/auth'
+import {
+  discardSoloConflict, getSoloConflict, getSoloMatch, listSoloLocations, removeSoloMatch, syncCloudSoloToLocal, upsertSoloMatch,
+} from '../../core/solo-match-service'
+import { listCachedTables, listMyTables, tableContext, type TableSummary } from '../../core/table-directory-service'
 
 import './index.scss'
 
@@ -119,7 +127,11 @@ function withAutoLastDelta(list: PlayerDraft[]): PlayerDraft[] {
 
 export default function RecordEditPage() {
   const { identity, scope } = useTableIdentity()
-  const [route, setRoute] = useState<{ id?: string; draft?: string }>({})
+  const [route, setRoute] = useState<{ id?: string; draft?: string; mode?: string; tableId?: string }>(() => {
+    const params = Taro.getCurrentInstance()?.router?.params || {}
+    return { id: params.id, draft: params.draft, mode: params.mode, tableId: params.tableId }
+  })
+  const [custom, setCustom] = useState<TableSummary | null>(null)
   const [loadedRevision, setLoadedRevision] = useState<number>()
   const [loadedScope, setLoadedScope] = useState('')
   const [loadError, setLoadError] = useState('')
@@ -141,7 +153,9 @@ export default function RecordEditPage() {
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const recentLocations = useMemo(() => listRecentLocations(), [])
+  const playCtx = custom ? tableContext(custom) : undefined
+  const expectedScope = custom ? `custom:${custom.id}:${custom.bindingId}` : scope
+  const recentLocations = useMemo(() => listRecentLocations(8, playCtx), [custom])
 
   const multiValue = useMemo(() => {
     const d = new Date(playedAt)
@@ -152,12 +166,45 @@ export default function RecordEditPage() {
     return [dayIdx, d.getHours(), d.getMinutes()]
   }, [playedAt, dayOptions])
 
-  useLoad((opts) => { setRoute({ id: opts?.id, draft: opts?.draft }) })
+  useLoad((opts) => { setRoute({ id: opts?.id, draft: opts?.draft, mode: opts?.mode, tableId: opts?.tableId }) })
   useEffect(() => {
     let active = true
     setLoadedScope('')
     setLoadError('')
-    if (!identity) return
+    const customId = route.mode === 'solo' ? '' : route.tableId && route.tableId !== 'fixed-four' ? route.tableId : ''
+    if (route.mode === 'solo') return () => { active = false }
+    if (customId) {
+      const loadCustom = async () => {
+        let table = listCachedTables().find((item) => item.id === customId)
+        if (!table) {
+          try { table = (await listMyTables()).find((item) => item.id === customId) } catch { /* 离线只用已缓存的桌子 */ }
+        }
+        if (!active) return
+        if (!table) { setLoadError('找不到这张桌子，请返回重新进入'); return }
+        const ctx = tableContext(table)
+        if (route.id) await syncCloudMatchesToLocal(ctx)
+        if (!active) return
+        const record = route.id ? getMatch(route.id, ctx) : undefined
+        const draft = route.draft && route.id ? getMatchConflict(route.id, ctx)?.draft : undefined
+        if (route.id && !record && !draft) { setLoadError('这场牌局已不存在，请返回刷新'); return }
+        const source = draft || record
+        setCustom(table)
+        setEditId(record?.id)
+        setLoadedRevision(record?.revision)
+        setPlayedAt(source?.playedAt || Date.now())
+        if (source) setDayOptions(buildDayOptions(source.playedAt))
+        setNote(source?.note || '')
+        setLocation(source?.location || '家庭局')
+        setPerformance(source?.performance)
+        setReasons(source?.reasons || [])
+        setPlayers(source ? withAutoLastDelta(source.players.map((player) => ({ name: player.name, isSelf: player.name === table.mySeat, delta: String(player.scoreDelta ?? '') }))) : table.seats.map((name) => ({ name, isSelf: name === table.mySeat, delta: '' })))
+        setLoadedScope(`custom:${table.id}:${table.bindingId}`)
+        Taro.setNavigationBarTitle({ title: record ? '编辑本桌牌局' : '记录本桌牌局' })
+      }
+      void loadCustom()
+      return () => { active = false }
+    }
+    if (!identity) return () => { active = false }
     const load = async () => {
       if (route.id) await syncCloudMatchesToLocal()
       if (!active || identityScope() !== scope) return
@@ -179,7 +226,7 @@ export default function RecordEditPage() {
     }
     void load()
     return () => { active = false }
-  }, [scope, route.id, route.draft])
+  }, [scope, route.id, route.draft, route.mode, route.tableId])
 
   const unitLabel = '分'
   const scoreSumPreview = useMemo(() => {
@@ -218,7 +265,7 @@ export default function RecordEditPage() {
 
   const handleSave = async () => {
     if (saving) return
-    if (!loadedScope || identityScope() !== loadedScope) { Taro.showToast({ title: '身份已变化，请重新打开', icon: 'none' }); return }
+    if (!loadedScope || expectedScope !== loadedScope) { Taro.showToast({ title: '身份已变化，请重新打开', icon: 'none' }); return }
 
     const deltas = players.map((p) => parseDeltaInput(p.delta))
     const nums = deltas.filter((v): v is number => v !== null)
@@ -264,8 +311,8 @@ export default function RecordEditPage() {
         performance,
         reasons,
         note,
-      })
-      if (route.draft && route.id) discardMatchConflict(route.id)
+      }, playCtx)
+      if (route.draft && route.id) discardMatchConflict(route.id, playCtx)
       Taro.showToast({ title: '已保存，等待同步', icon: 'success' })
       setTimeout(() => Taro.navigateBack(), 400)
     } catch (e) {
@@ -282,20 +329,23 @@ export default function RecordEditPage() {
       content: '删除会同步影响四个人的战绩，确认删除这场公共牌局？',
       success: (res) => {
         if (!res.confirm) return
-        if (identityScope() !== loadedScope) return
-        try { removeMatch(editId, loadedRevision) } catch (e) { Taro.showToast({ title: e instanceof Error ? e.message : '删除失败', icon: 'none' }); return }
+        if (expectedScope !== loadedScope) return
+        try { removeMatch(editId, loadedRevision, playCtx) } catch (e) { Taro.showToast({ title: e instanceof Error ? e.message : '删除失败', icon: 'none' }); return }
         Taro.showToast({ title: '已删除', icon: 'success' })
         setTimeout(() => Taro.navigateBack(), 400)
       },
     })
   }
 
-  if (!identity) return <TableIdentityGate />
-  if (loadError || loadedScope !== scope) return <View className="record-edit-page"><Text>{loadError || '正在读取牌局…'}</Text></View>
+  if (route.mode === 'solo') return <SoloRecordEditor route={route} />
+  const expectsCustom = !!route.tableId && route.tableId !== 'fixed-four'
+  if (expectsCustom && !custom) return <View className="record-edit-page"><Text>{loadError || '正在读取桌子…'}</Text></View>
+  if (!identity && !expectsCustom) return <TableIdentityGate />
+  if (loadError || loadedScope !== expectedScope) return <View className="record-edit-page"><Text>{loadError || '正在读取牌局…'}</Text></View>
   return (
     <View className="record-edit-page">
       {route.draft && <Text className="hint-text">正在核对本机草稿。{editId ? '保存会提交到当前云端版本。' : '原牌局已不存在，保存将另建一场，请先确认是否需要。'}</Text>}
-      <Text className="hint-text">{identity.playerName} · 四人共享牌局，修改将同步给所有人</Text>
+      <Text className="hint-text">{(custom?.mySeat || identity?.playerName)} · 四人共享牌局，修改将同步给所有人</Text>
       <View className="section-card">
         <View className="section-head">
           <NotesOutlined size={18} color={BRAND} />
@@ -443,6 +493,132 @@ export default function RecordEditPage() {
           删除此牌局
         </Text>
       )}
+    </View>
+  )
+}
+
+function SoloRecordEditor({ route }: { route: { id?: string; draft?: string } }) {
+  const [openid, setOpenid] = useState(getCachedUser()?.openid || '')
+  const [loaded, setLoaded] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [editId, setEditId] = useState<string>()
+  const [loadedRevision, setLoadedRevision] = useState<number>()
+  const [dayOptions, setDayOptions] = useState(() => buildDayOptions())
+  const [playedAt, setPlayedAt] = useState(Date.now())
+  const [location, setLocation] = useState('家庭局')
+  const [seat, setSeat] = useState<SoloSeat | undefined>()
+  const [score, setScore] = useState('')
+  const [performance, setPerformance] = useState<MatchPerformance | undefined>('good')
+  const [reasons, setReasons] = useState<MatchReason[]>([])
+  const [note, setNote] = useState('')
+  const [saving, setSaving] = useState(false)
+  const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => pad2(i)), [])
+  const minutes = useMemo(() => Array.from({ length: 60 }, (_, i) => pad2(i)), [])
+  const locations = useMemo(() => listSoloLocations(), [loaded])
+  useEffect(() => {
+    let active = true
+    const load = async () => {
+      if (!getCachedUser()?.openid) {
+        const user = await ensureLogin()
+        if (!active) return
+        if (!user?.openid) { setLoadError('请先微信登录，单人分数会保存到云端'); return }
+        setOpenid(user.openid)
+      }
+      if (route.id) await syncCloudSoloToLocal()
+      if (!active) return
+      const record = route.id ? getSoloMatch(route.id) : undefined
+      const draft = route.draft && route.id ? getSoloConflict(route.id)?.draft : undefined
+      if (route.id && !record && !draft) { setLoadError('这场记录已不存在，请返回刷新'); return }
+      const source = draft || record
+      setEditId(record?.id)
+      setLoadedRevision(record?.revision)
+      setPlayedAt(source?.playedAt || Date.now())
+      if (source) setDayOptions(buildDayOptions(source.playedAt))
+      setLocation(source?.location || '家庭局')
+      setSeat(source?.seat)
+      setScore(source ? String(source.scoreDelta) : '')
+      setPerformance(source?.performance)
+      setReasons(source?.reasons || [])
+      setNote(source?.note || '')
+      setLoaded(true)
+      Taro.setNavigationBarTitle({ title: record ? '编辑单人分数' : '记录单人分数' })
+    }
+    void load()
+    return () => { active = false }
+  }, [route.id, route.draft])
+  const multiValue = useMemo(() => {
+    const date = new Date(playedAt)
+    const dayStart = new Date(date)
+    dayStart.setHours(0, 0, 0, 0)
+    let dayIdx = dayOptions.findIndex((item) => item.time === dayStart.getTime())
+    if (dayIdx < 0) dayIdx = dayOptions.length - 1
+    return [dayIdx, date.getHours(), date.getMinutes()]
+  }, [playedAt, dayOptions])
+  const save = async () => {
+    if (saving) return
+    const delta = parseDeltaInput(score)
+    if (delta === null) { Taro.showToast({ title: '请输入本场分数', icon: 'none' }); return }
+    if (route.draft && !editId) {
+      const confirmation = await Taro.showModal({ title: '另存为新记录', content: '云端已不存在原记录。确认后会写成一条新的单人分数。' })
+      if (!confirmation.confirm) return
+    }
+    setSaving(true)
+    try {
+      upsertSoloMatch({ id: editId, revision: loadedRevision, playedAt, scoreDelta: delta, location, seat, note, performance, reasons })
+      if (route.draft && route.id) discardSoloConflict(route.id)
+      Taro.showToast({ title: '已保存，正在同步云端', icon: 'success' })
+      setTimeout(() => Taro.navigateBack(), 400)
+    } catch (error) {
+      Taro.showToast({ title: error instanceof Error ? error.message : '保存失败，请重试', icon: 'none' })
+    } finally { setSaving(false) }
+  }
+  const remove = () => {
+    if (!editId) return
+    void Taro.showModal({ title: '删除记录', content: '云端和本机都会删除这场单人分数。', success: (result) => {
+      if (!result.confirm) return
+      try { removeSoloMatch(editId, loadedRevision) } catch (error) { Taro.showToast({ title: error instanceof Error ? error.message : '删除失败', icon: 'none' }); return }
+      Taro.showToast({ title: '已删除', icon: 'success' })
+      setTimeout(() => Taro.navigateBack(), 400)
+    } })
+  }
+  if (!openid || loadError || !loaded) return <View className="record-edit-page"><Text>{loadError || '正在读取单人分数…'}</Text></View>
+  const deltaNum = parseDeltaInput(score)
+  const deltaClass = deltaNum !== null && deltaNum < 0 ? 'neg' : deltaNum !== null && deltaNum > 0 ? 'pos' : ''
+  return (
+    <View className="record-edit-page">
+      <Text className="hint-text">只记你自己的分数，保存后写入云端，不和四人牌桌混在一起</Text>
+      <View className="section-card">
+        <View className="section-head"><CalendarOutlined size={18} color={BRAND} /><Text className="section-title">这场</Text></View>
+        <Picker mode="multiSelector" range={[dayOptions.map((item) => item.label), hours, minutes]} value={multiValue} onChange={(event) => {
+          const [dayIdx, hourIdx, minuteIdx] = event.detail.value as number[]
+          const day = dayOptions[dayIdx] || dayOptions[dayOptions.length - 1]
+          const next = new Date(day.time)
+          next.setHours(hourIdx, minuteIdx, 0, 0)
+          setPlayedAt(next.getTime())
+        }}>
+          <View className="basic-col"><Text className="basic-label">日期</Text><Text className="basic-value">{formatDisplayTime(playedAt)}</Text></View>
+        </Picker>
+        <Input className="basic-input" value={location} placeholder="家庭局" onInput={(event) => setLocation(event.detail.value)} />
+        {!!locations.length && <View className="chip-row">{locations.slice(0, 4).map((item) => <Text key={item} className="chip" onClick={() => setLocation(item)}>{item}</Text>)}</View>}
+      </View>
+      <View className="section-card">
+        <View className="section-head"><BarChartOutlined size={18} color={BRAND} /><Text className="section-title">我的分数</Text></View>
+        <Input className={`player-delta ${deltaClass}`} type="text" value={score} placeholder="0分" onInput={(event) => setScore(event.detail.value.replace(/[^\d.-]/g, ''))} />
+        <Text className="sub-label">这一场坐在哪一方</Text>
+        <View className="seat-picker">{SOLO_SEATS.map((item) => <Text key={item.value} className={`seat-choice ${seat === item.value ? 'active' : ''}`} onClick={() => setSeat(seat === item.value ? undefined : item.value)}>{item.label}</Text>)}</View>
+      </View>
+      <View className="section-card">
+        <Text className="sub-label">你的表现如何？</Text>
+        <View className="perf-row">{PERFORMANCE_OPTIONS.map((opt) => <View key={opt.value} className={`perf-btn ${performance === opt.value ? 'active' : ''}`} onClick={() => setPerformance(opt.value)}><Text className="perf-emoji">{opt.emoji}</Text><Text className="perf-text">{opt.label}</Text></View>)}</View>
+        <Text className="sub-label">主要原因（可多选）</Text>
+        <View className="reason-grid">{REASON_OPTIONS.map((opt) => <View key={opt.value} className={`reason-chip ${reasons.includes(opt.value) ? 'active' : ''}`} onClick={() => setReasons((prev) => prev.includes(opt.value) ? prev.filter((item) => item !== opt.value) : [...prev, opt.value])}><Text className="reason-emoji">{opt.emoji}</Text><Text className="reason-text">{opt.label}</Text></View>)}</View>
+      </View>
+      <View className="section-card">
+        <Text className="sub-label">备注 · 仅自己可见</Text>
+        <Textarea className="record-note-input" value={note} maxlength={500} placeholder="记下这场的分数和原因…" onInput={(event) => setNote(event.detail.value)} />
+      </View>
+      <Button className="save-btn" color="primary" block shape="round" loading={saving} onClick={save}>保存到云端</Button>
+      {editId && <Text className="delete-link" onClick={remove}>删除此记录</Text>}
     </View>
   )
 }

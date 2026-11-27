@@ -18,7 +18,13 @@ function Medal({ badge, large = false }: { badge: MatchBadgeView; large?: boolea
   )
 }
 
-export default function MatchBadgeWall({ badges, playerName }: { badges: MatchBadgeView[]; playerName: string }) {
+export default function MatchBadgeWall({ badges, playerName, ledgerKey, title = '我的荣誉', intro = '每一场，都是进阶的印记 · 生涯积分荣誉' }: {
+  badges: MatchBadgeView[]
+  playerName: string
+  ledgerKey?: string
+  title?: string
+  intro?: string
+}) {
   const [selectedId, setSelectedId] = useState<string>()
   const [celebration, setCelebration] = useState<string[]>([])
   const [celebrationIndex, setCelebrationIndex] = useState(0)
@@ -30,14 +36,14 @@ export default function MatchBadgeWall({ badges, playerName }: { badges: MatchBa
   const celebrating = celebration.length > 0
   useEffect(() => {
     if (!badges.length) return
-    const pending = getPendingBadgeIds(playerName).filter((id) => !offered.current.has(id) && badges.some((b) => b.id === id))
+    const pending = getPendingBadgeIds(playerName, ledgerKey).filter((id) => !offered.current.has(id) && badges.some((b) => b.id === id))
     if (pending.length) {
       pending.forEach((id) => offered.current.add(id))
       setCelebration((existing) => [...existing, ...pending])
     }
-  }, [badges, playerName])
+  }, [badges, playerName, ledgerKey])
   const close = () => {
-    if (celebration.length) markBadgesSeen(celebration, playerName)
+    if (celebration.length) markBadgesSeen(celebration, playerName, ledgerKey)
     setCelebration([])
     setCelebrationIndex(0)
     setSelectedId(undefined)
@@ -49,10 +55,10 @@ export default function MatchBadgeWall({ badges, playerName }: { badges: MatchBa
   return (
     <View className="honor-section">
       <View className="honor-heading">
-        <View><Text className="honor-eyebrow">HALL OF HONORS</Text><Text className="honor-title">我的荣誉</Text></View>
+        <View><Text className="honor-eyebrow">HALL OF HONORS</Text><Text className="honor-title">{title}</Text></View>
         <Text className="honor-count">{unlocked}<Text className="honor-count-total"> / {badges.length}</Text></Text>
       </View>
-      <Text className="honor-intro">每一场，都是进阶的印记 · 生涯积分荣誉</Text>
+      <Text className="honor-intro">{intro}</Text>
       <View className="honor-grid">
         {sorted.map((badge, index) => (
           <View key={badge.id} className={`honor-card rarity-${badge.rarity} ${badge.unlockedAt ? 'is-earned' : 'is-locked'}`}

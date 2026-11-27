@@ -37,6 +37,8 @@ export default defineAppConfig({
       root: 'pages/mystic',
       pages: ['index'],
     },
+    { root: 'pages/table', pages: ['index'] },
+    { root: 'pages/table-create', pages: ['index'] },
   ],
   window: {
     backgroundTextStyle: 'light',

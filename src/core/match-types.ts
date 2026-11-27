@@ -135,3 +135,105 @@ export function formatDelta(value: number): string {
   const sign = value > 0 ? '+' : ''
   return `${sign}${value}分`
 }
+
+/** 单人账本里的本人，不对应任何四人座位。 */
+export const SOLO_SELF_NAME = '我'
+
+/** 单人记账时的桌面方位，用来比较不同位置的胜率和手气。 */
+export const SOLO_SEATS = [
+  { value: 'east', label: '东' },
+  { value: 'south', label: '南' },
+  { value: 'west', label: '西' },
+  { value: 'north', label: '北' },
+] as const
+export type SoloSeat = typeof SOLO_SEATS[number]['value']
+
+export function isSoloSeat(value: unknown): value is SoloSeat {
+  return SOLO_SEATS.some((seat) => seat.value === value)
+}
+
+export function soloSeatLabel(seat?: SoloSeat): string {
+  return SOLO_SEATS.find((item) => item.value === seat)?.label || ''
+}
+
+export interface SoloMatchRecord {
+  id: string
+  playedAt: number
+  variant: MatchVariant
+  location?: string
+  /** 这一场自己坐的方位。不填则不进入位置玄学。 */
+  seat?: SoloSeat
+  settleUnit: 'score'
+  scoreDelta: number
+  result: MatchResult
+  performance?: MatchPerformance
+  reasons?: MatchReason[]
+  note?: string
+  createdAt: number
+  updatedAt: number
+  revision?: number
+}
+
+/** 单人记录转成仅含本人的牌局，便于复用赛季统计。 */
+export function soloToMatchRecord(record: SoloMatchRecord): MatchRecord {
+  return {
+    id: record.id,
+    playedAt: record.playedAt,
+    variant: record.variant,
+    location: record.location,
+    settleUnit: 'score',
+    result: deriveMatchResult(record.scoreDelta),
+    players: [{ name: SOLO_SELF_NAME, isSelf: true, scoreDelta: record.scoreDelta }],
+    performance: record.performance,
+    reasons: record.reasons,
+    note: record.note,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    revision: record.revision,
+  }
+}
+
+export interface TablePlayContext {
+  tableId: string
+  playerName: string
+  bindingId: string
+  seats: string[]
+  role: 'admin' | 'member'
+}
+
+/** 按指定座位接纳牌局。不改写名字大小写，供自定义桌子和单人账本使用。 */
+export function seatMatchRecords(records: MatchRecord[], seats: readonly string[], selfName: string): MatchRecord[] {
+  const expected = seats.map((name) => name.trim())
+  if (!expected.length || expected.some((name) => !name) || new Set(expected).size !== expected.length) return []
+  return records.flatMap((record) => {
+    const accepted = acceptSeatRecord(record, expected, selfName)
+    return accepted ? [accepted] : []
+  })
+}
+
+function acceptSeatRecord(record: MatchRecord, expected: string[], selfName: string): MatchRecord | undefined {
+  if (record.settleUnit !== 'score' || !Array.isArray(record.players) || record.players.length !== expected.length) return undefined
+  const byName = new Map<string, MatchPlayer>()
+  for (const player of record.players) {
+    if (!player || typeof player.name !== 'string') return undefined
+    const name = player.name.trim()
+    if (!expected.includes(name) || byName.has(name)) return undefined
+    byName.set(name, { ...player, name, isSelf: name === selfName })
+  }
+  if (expected.some((name) => !byName.has(name))) return undefined
+  const players = expected.map((name) => byName.get(name)!)
+  const self = players.find((player) => player.name === selfName)
+  if (!self) return undefined
+  return { ...record, players, result: deriveMatchResult(getPlayerDelta(self)) }
+}
+
+/** 建桌前的本地校验。云函数会再验一次，这里只负责即时提示。 */
+export function validateTableDraft(name: string, seats: string[], mySeat: string): string | undefined {
+  const tableName = name.trim()
+  if (!tableName || [...tableName].length > 16) return '桌名需要 1 到 16 个字'
+  const cleaned = seats.map((seat) => seat.trim())
+  if (cleaned.length !== 4 || cleaned.some((seat) => !seat || [...seat].length > 12)) return '每个座位名需要 1 到 12 个字'
+  if (new Set(cleaned.map((seat) => seat.toLocaleLowerCase('zh-CN'))).size !== 4) return '四个座位名不能重复'
+  if (!cleaned.includes(mySeat.trim())) return '请选择自己的座位'
+  return undefined
+}

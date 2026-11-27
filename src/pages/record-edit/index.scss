@@ -346,3 +346,15 @@
 }
 
 .record-note-input { width: 100%; min-height: 140px; box-sizing: border-box; padding: 20px; background: #f5f7f1; border-radius: 16px; font-size: 26px; line-height: 1.7; color: #304e36; }
+
+.seat-picker { display: flex; gap: 12px; margin-top: 16px; }
+.seat-choice {
+  flex: 1;
+  padding: 16px 0;
+  border-radius: 16px;
+  background: #f5f5f0;
+  color: #5c665c;
+  text-align: center;
+  font-size: 28px;
+}
+.seat-choice.active { background: #1a5c2e; color: #fff; }

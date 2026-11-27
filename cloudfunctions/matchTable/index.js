@@ -3,6 +3,7 @@ const { createHash, randomBytes } = require('crypto')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const venueAction = require('./venue-actions.js')
+const routeExtra = require('./table-directory.js')
 const TABLE_ID = 'fixed-four'
 const NAMES = ['HENING', 'WUYU', 'TANGXIANG', 'DUHAN']
 const REASONS = ['greedy', 'aggressive', 'defense', 'discard', 'riichi_choice', 'luck']
@@ -48,6 +49,8 @@ exports.main = async (event = {}) => {
   if (!OPENID) return fail('UNAUTHORIZED', '请先微信登录')
   if (event.schemaVersion !== 2) return fail('UPGRADE_REQUIRED', '请更新小程序后重试')
   try {
+    const extra = await routeExtra({ event, db, openid: OPENID, readDoc, fail, pages, hash, REASONS })
+    if (extra) return extra
     const tableRef = db.collection('match_tables').doc(TABLE_ID)
     const table = await readDoc(tableRef)
     if (!table?.ready) return fail('NOT_READY', '牌桌正在升级，请稍后再试')

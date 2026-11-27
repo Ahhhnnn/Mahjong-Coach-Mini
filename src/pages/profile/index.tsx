@@ -21,12 +21,10 @@ import { ensureLogin, uploadAvatar, updateUserProfile, getCachedUser, isLoggedIn
 import { loadMistakes } from '../../core/mistake-service'
 import { listFavorites } from '../../core/favorite-service'
 import { getLevelTitle } from '../../core/train-stats-service'
-import { listMatches } from '../../core/match-service'
+import { listSoloMatches, SOLO_CHANGED, soloScope } from '../../core/solo-match-service'
 import { computeMatchStats } from '../../core/match-stats-service'
-import { formatDelta } from '../../core/match-types'
+import { formatDelta, SOLO_SELF_NAME, soloToMatchRecord } from '../../core/match-types'
 import { useTableIdentity } from '../../hooks/use-table-identity'
-import { getTableIdentity, identityScope } from '../../core/table-identity-service'
-import { MATCHES_CHANGED } from '../../core/match-service'
 import { useEffect } from 'react'
 import mascotImg from '../../assets/mascot/panda.png'
 
@@ -36,8 +34,9 @@ const BRAND = '#1a5c2e'
 const comingSoon = () => Taro.showToast({ title: '即将上线', icon: 'none' })
 
 export default function ProfilePage() {
-  const { identity, scope } = useTableIdentity()
+  const { identity } = useTableIdentity()
   const [userInfo, setUserInfo] = useState<UserInfo | null>(getCachedUser())
+  const openid = userInfo?.openid || ''
   const [loggedIn, setLoggedIn] = useState(isLoggedIn())
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [loginLoading, setLoginLoading] = useState(false)
@@ -57,7 +56,7 @@ export default function ProfilePage() {
     matchCumText: '+0分',
   })
 
-  const stats = storedStats.matchScope === scope ? storedStats : { ...storedStats, matchTotal: 0, matchWinRate: 0, matchCumText: '+0分' }
+  const stats = soloScope(openid) && storedStats.matchScope === soloScope(openid) ? storedStats : { ...storedStats, matchTotal: 0, matchWinRate: 0, matchCumText: '+0分' }
 
   useDidShow(() => {
     setLoggedIn(isLoggedIn())
@@ -70,9 +69,9 @@ export default function ProfilePage() {
         const reasonable = records.filter((r: any) => r.reasonable).length
         const practiced = new Set(records.map((r: any) => r.puzzleId).filter(Boolean)).size
         const xp = records.reduce((s: number, r: any) => s + (r.reasonable ? 10 : 3), 0)
-        const ms = computeMatchStats(listMatches(), { range: 'month', playerName: getTableIdentity()?.playerName })
+        const ms = computeMatchStats(listSoloMatches().map(soloToMatchRecord), { range: 'month', playerName: SOLO_SELF_NAME, seats: [SOLO_SELF_NAME] })
         setStats({
-          matchScope: identityScope(),
+          matchScope: soloScope(),
           practiced,
           reasonable,
           days,
@@ -96,13 +95,13 @@ export default function ProfilePage() {
     setUserInfo(getCachedUser())
     setLoggedIn(isLoggedIn())
     const update = () => {
-      const ms = computeMatchStats(listMatches(), { range: 'month', playerName: getTableIdentity()?.playerName })
-      setStats((previous) => ({ ...previous, matchScope: identityScope(), matchTotal: ms.total, matchWinRate: ms.winRate, matchCumText: formatDelta(ms.cumulative) }))
+      const ms = computeMatchStats(listSoloMatches().map(soloToMatchRecord), { range: 'month', playerName: SOLO_SELF_NAME, seats: [SOLO_SELF_NAME] })
+      setStats((previous) => ({ ...previous, matchScope: soloScope(), matchTotal: ms.total, matchWinRate: ms.winRate, matchCumText: formatDelta(ms.cumulative) }))
     }
     update()
-    Taro.eventCenter.on(MATCHES_CHANGED, update)
-    return () => { Taro.eventCenter.off(MATCHES_CHANGED, update) }
-  }, [scope])
+    Taro.eventCenter.on(SOLO_CHANGED, update)
+    return () => { Taro.eventCenter.off(SOLO_CHANGED, update) }
+  }, [openid])
 
   const handleLogin = async () => {
     setLoginLoading(true)
@@ -165,7 +164,7 @@ export default function ProfilePage() {
   const levelProgress = (stats.xp % 100) / 100 * 100
   const displayName = loggedIn ? (userInfo?.nickname || '麻将学员') : '未登录'
   const goRecords = () => Taro.switchTab({ url: '/pages/records/index' })
-  const goRecordEdit = () => Taro.navigateTo({ url: '/pages/record-edit/index' })
+  const goRecordEdit = () => Taro.navigateTo({ url: '/pages/record-edit/index?mode=solo' })
 
   return (
     <View className="profile-page">

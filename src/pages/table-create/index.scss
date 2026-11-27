@@ -1,0 +1,58 @@
+.table-create-page {
+  min-height: 100vh;
+  background: #f5f5f0;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.table-create-card {
+  margin-bottom: 24px;
+  padding: 24px;
+  border-radius: 24px;
+  background: #fff;
+}
+
+.table-create-title {
+  display: block;
+  margin-bottom: 16px;
+  font-size: 32px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.table-create-input {
+  margin-bottom: 12px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: #f5f5f0;
+  font-size: 28px;
+}
+
+.table-create-seat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.table-create-check {
+  flex-shrink: 0;
+  color: #1a5c2e;
+  font-size: 24px;
+}
+
+.table-create-error {
+  display: block;
+  margin: 8px 0 16px;
+  color: #a74e3a;
+  font-size: 24px;
+}
+
+.table-create-code {
+  display: block;
+  margin: 12px 0;
+  color: #1a5c2e;
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: 6px;
+}

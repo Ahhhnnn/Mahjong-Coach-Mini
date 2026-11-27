@@ -4,6 +4,7 @@ import {
   getPlayerDelta,
   getSelfDelta,
   getSelfPlayer,
+  seatMatchRecords,
   SELF_PLAYER_NAME,
   type MatchPerformance,
   type MatchReason,
@@ -143,9 +144,13 @@ export function filterByRange(records: MatchRecord[], range: StatsRange): MatchR
   return records.filter((r) => r.playedAt >= start)
 }
 
-export function buildTrend(records: MatchRecord[], span: TrendSpan, selfName = SELF_PLAYER_NAME): MatchTrend {
+function acceptedRecords(records: MatchRecord[], selfName: string, seats?: readonly string[]): MatchRecord[] {
+  return seats ? seatMatchRecords(records, seats, selfName) : fixedMatchRecords(records, selfName)
+}
+
+export function buildTrend(records: MatchRecord[], span: TrendSpan, selfName = SELF_PLAYER_NAME, seats?: readonly string[]): MatchTrend {
   const start = trendSpanStart(span)
-  const sorted = fixedMatchRecords(records, selfName).filter((r) => r.settleUnit === 'score' && r.playedAt >= start)
+  const sorted = acceptedRecords(records, selfName, seats).filter((r) => r.settleUnit === 'score' && r.playedAt >= start)
     .slice().sort(compareMatchesByTime)
   if (!sorted.length) return { points: [], series: [] }
   const members = new Map<string, TrendSeries>()
@@ -167,10 +172,10 @@ export function buildTrend(records: MatchRecord[], span: TrendSpan, selfName = S
   return { points, series: Array.from(members.values()).sort((a, b) => Number(b.id === '__self__') - Number(a.id === '__self__') || a.id.localeCompare(b.id)) }
 }
 
-export function buildRanking(records: MatchRecord[], selfName = SELF_PLAYER_NAME): RankEntry[] {
+export function buildRanking(records: MatchRecord[], selfName = SELF_PLAYER_NAME, seats?: readonly string[]): RankEntry[] {
   const map = new Map<string, RankEntry>()
 
-  for (const r of fixedMatchRecords(records, selfName).filter((record) => record.settleUnit === 'score')) {
+  for (const r of acceptedRecords(records, selfName, seats).filter((record) => record.settleUnit === 'score')) {
     r.players.forEach((p) => {
       const key = memberKey(p)
 
@@ -203,8 +208,8 @@ function reasonLabel(r: MatchReason): string {
   return REASON_OPTIONS.find((o) => o.value === r)?.label || r
 }
 
-export function buildAiInsight(records: MatchRecord[], selfName = SELF_PLAYER_NAME): AiInsight {
-  const recent = fixedMatchRecords(records, selfName).sort((a, b) => compareMatchesByTime(b, a)).slice(0, 20)
+export function buildAiInsight(records: MatchRecord[], selfName = SELF_PLAYER_NAME, seats?: readonly string[]): AiInsight {
+  const recent = acceptedRecords(records, selfName, seats).sort((a, b) => compareMatchesByTime(b, a)).slice(0, 20)
   const reasonCount = new Map<MatchReason, number>()
   let aggressive = 0
   let defense = 0
@@ -293,12 +298,13 @@ export function computeMatchStats(
     trendSpan?: TrendSpan
     season?: MatchSeason
     playerName?: string
+    seats?: readonly string[]
   } = {}
 ): MatchStats {
   const selfName = options.playerName || SELF_PLAYER_NAME
   const range = options.range || 'all'
   const trendSpan = options.trendSpan || 'all'
-  const scoreRecords = fixedMatchRecords(records, selfName)
+  const scoreRecords = acceptedRecords(records, selfName, options.seats)
   const filtered = options.season ? filterBySeason(scoreRecords, options.season) : filterByRange(scoreRecords, range)
 
   let wins = 0
@@ -325,9 +331,9 @@ export function computeMatchStats(
     winRate,
     cumulative,
     // 历史赛季从零累计，不能再套用相对于今天的滚动时间窗口。
-    trend: buildTrend(options.season ? filtered : records, options.season ? 'all' : trendSpan, selfName),
-    ranking: buildRanking(filtered, selfName),
-    ai: buildAiInsight(options.season ? filtered : records, selfName),
+    trend: buildTrend(options.season ? filtered : records, options.season ? 'all' : trendSpan, selfName, options.seats),
+    ranking: buildRanking(filtered, selfName, options.seats),
+    ai: buildAiInsight(options.season ? filtered : records, selfName, options.seats),
   }
 }
 

@@ -1,6 +1,6 @@
 import {
   compareMatchesByTime, fixedMatchRecords, FIXED_MATCH_PLAYERS,
-  getPlayerDelta, getSelfDelta, SELF_PLAYER_NAME, type MatchRecord,
+  getPlayerDelta, getSelfDelta, seatMatchRecords, SELF_PLAYER_NAME, type MatchRecord,
 } from './match-types'
 import { filterBySeason, type MatchSeason } from './match-stats-service'
 
@@ -40,8 +40,10 @@ export interface MatchMystic {
 }
 
 /** 仅分析可核验的积分牌局；不根据总积分推断两人间的输赢流水。 */
-export function computeMatchMystic(records: MatchRecord[], season?: MatchSeason, selfName = SELF_PLAYER_NAME): MatchMystic {
-  const valid = fixedMatchRecords(records, selfName).filter((record) => Number.isFinite(record.playedAt)
+export function computeMatchMystic(records: MatchRecord[], season?: MatchSeason, selfName = SELF_PLAYER_NAME, seats?: readonly string[]): MatchMystic {
+  const accepted = seats ? seatMatchRecords(records, seats, selfName) : fixedMatchRecords(records, selfName)
+  const order = seats || FIXED_MATCH_PLAYERS
+  const valid = accepted.filter((record) => Number.isFinite(record.playedAt)
     && record.players.every((player) => Number.isFinite(player.scoreDelta))
     && Math.abs(record.players.reduce((sum, player) => sum + player.scoreDelta!, 0)) < 1e-6)
   const games = (season ? filterBySeason(valid, season) : valid).slice().sort(compareMatchesByTime)
@@ -80,8 +82,8 @@ export function computeMatchMystic(records: MatchRecord[], season?: MatchSeason,
     ...entry, pressureRate: entry.ahead / entry.games * 100,
     averageGap: entry.averageGap / entry.games, eligible: entry.games >= MYSTIC_MIN_GAMES,
   })).sort((a, b) => b.pressureRate - a.pressureRate || b.averageGap - a.averageGap
-    || FIXED_MATCH_PLAYERS.indexOf(a.name as typeof FIXED_MATCH_PLAYERS[number])
-      - FIXED_MATCH_PLAYERS.indexOf(b.name as typeof FIXED_MATCH_PLAYERS[number]))
+    || order.indexOf(a.name as typeof FIXED_MATCH_PLAYERS[number])
+      - order.indexOf(b.name as typeof FIXED_MATCH_PLAYERS[number]))
   const locationList = Array.from(locations.values()).map((entry) => ({
     ...entry, average: entry.total / entry.games, positiveRate: entry.wins / entry.games * 100,
     eligible: entry.games >= MYSTIC_MIN_GAMES,

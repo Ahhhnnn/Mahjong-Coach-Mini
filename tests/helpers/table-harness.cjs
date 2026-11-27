@@ -48,6 +48,7 @@ function server() {
         get: async () => ({ data: documents.has(id) ? clone({ ...documents.get(id), _id: id }) : undefined }),
         set: async ({ data }) => { documents.set(id, clone(data)); writes.push({ collection: name, id, ...clone(data) }); return { stats: { updated: 1 } } },
         update: async ({ data }) => { if (!documents.has(id)) throw new Error('document not exist'); documents.set(id, { ...documents.get(id), ...clone(data) }); writes.push({ collection: name, id, ...clone(data) }); return { stats: { updated: 1 } } },
+        remove: async () => { documents.delete(id); writes.push({ collection: name, id, removed: true }); return { stats: { removed: 1 } } },
       }),
       add: async ({ data }) => { const id = data._id || String(documents.size); documents.set(id, clone(data)); return { _id: id } },
     }

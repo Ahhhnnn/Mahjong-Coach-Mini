@@ -1,6 +1,6 @@
 import Taro from '@tarojs/taro'
 import { identityScope } from './table-identity-service'
-import { fixedMatchRecords, getPlayerDelta, getSelfPlayer, SELF_PLAYER_NAME, type MatchRecord } from './match-types'
+import { fixedMatchRecords, getPlayerDelta, getSelfPlayer, seatMatchRecords, SELF_PLAYER_NAME, type MatchRecord } from './match-types'
 
 export type BadgeRarity = 'copper' | 'silver' | 'gold' | 'legend'
 type Metric = 'first' | 'games' | 'best' | 'winStreak' | 'rate' | 'stable' | 'second' | 'worst' | 'loseStreak' | 'volatile'
@@ -38,11 +38,14 @@ export const MATCH_BADGES: MatchBadge[] = [
   { id: 'lose_streak_3', name: '三连垫底', description: '连续 3 场垫底，触底必反弹', rarity: 'copper', symbol: 'fire', metric: 'loseStreak', target: 3 },
   { id: 'roller_coaster', name: '过山车', description: '得分标准差 ≥ 60（至少 10 场），大起大落', rarity: 'copper', symbol: 'fire', metric: 'volatile', target: 60 },
 ]
-function badgeKey(selfName: string): string { return identityScope() ? `${identityScope()}:badges` : `match_badges_v2:${selfName}` }
+function badgeKey(selfName: string, ledgerKey?: string): string {
+  if (ledgerKey) return `${ledgerKey}:badges`
+  return identityScope() ? `${identityScope()}:badges` : `match_badges_v2:${selfName}`
+}
 interface BadgeState { unlocked: Record<string, number>; seen: string[] }
-function readState(selfName: string): BadgeState {
+function readState(selfName: string, ledgerKey?: string): BadgeState {
   try {
-    const state = Taro.getStorageSync(badgeKey(selfName))
+    const state = Taro.getStorageSync(badgeKey(selfName, ledgerKey))
     if (state && typeof state.unlocked === 'object' && state.unlocked && Array.isArray(state.seen)) return state
   } catch { /* 本地降级 */ }
   return { unlocked: {}, seen: [] }
@@ -54,8 +57,12 @@ function meetsTarget(badge: MatchBadge, values: Record<Metric, number>): boolean
   return values.games > 0 && (!needsMinimumGames(badge) || values.games >= 10)
     && (badge.metric === 'stable' ? values.stable <= badge.target : values[badge.metric] >= badge.target)
 }
-function evaluate(records: MatchRecord[], selfName: string) {
-  const games = fixedMatchRecords(records, selfName).filter((r) => Number.isFinite(r.playedAt)
+export function evaluateMatchBadges(records: MatchRecord[], selfName = SELF_PLAYER_NAME, seats?: readonly string[]): MatchBadgeView[] {
+  return evaluate(records, selfName, seats)
+}
+function evaluate(records: MatchRecord[], selfName: string, seats?: readonly string[]) {
+  const accepted = seats ? seatMatchRecords(records, seats, selfName) : fixedMatchRecords(records, selfName)
+  const games = accepted.filter((r) => Number.isFinite(r.playedAt)
     && r.players.every((player) => Number.isFinite(player.scoreDelta))
     && Math.abs(r.players.reduce((sum, player) => sum + player.scoreDelta!, 0)) < 1e-6)
     .slice().sort((a, b) => a.playedAt - b.playedAt || a.id.localeCompare(b.id))
@@ -113,27 +120,31 @@ function evaluate(records: MatchRecord[], selfName: string) {
   })
 }
 
-/** 只在数据变更或打开牌局页时调用，渲染过程不写存储。 */
-export function updateMatchBadges(records: MatchRecord[], markSeen = false, selfName = SELF_PLAYER_NAME): MatchBadgeView[] {
-  const state = readState(selfName)
-  const evaluated = evaluate(records, selfName)
+/** 按账本键写入解锁与已读。渲染过程不要调用。 */
+export function persistBadgeViews(evaluated: MatchBadgeView[], selfName: string, ledgerKey?: string, markSeen = false): MatchBadgeView[] {
+  const state = readState(selfName, ledgerKey)
   const unlocked: Record<string, number> = {}
   for (const badge of evaluated) {
     if (badge.unlockedAt !== undefined) unlocked[badge.id] = badge.unlockedAt
   }
-  // 资格以当前有效历史为准，修复旧匿名牌局或旧算法留下的误授缓存。
+  // 资格以当前有效历史为准，修复旧算法留下的误授缓存。
   state.unlocked = unlocked
   state.seen = state.seen.filter((id) => unlocked[id] !== undefined)
   if (markSeen) state.seen = Object.keys(state.unlocked)
-  try { Taro.setStorageSync(badgeKey(selfName), state) } catch { /* 不阻塞牌局保存 */ }
+  try { Taro.setStorageSync(badgeKey(selfName, ledgerKey), state) } catch { /* 不阻塞牌局保存 */ }
   return evaluated
 }
-export function getPendingBadgeIds(selfName = SELF_PLAYER_NAME): string[] {
-  const state = readState(selfName)
+
+/** 只在数据变更或打开牌局页时调用，渲染过程不写存储。 */
+export function updateMatchBadges(records: MatchRecord[], markSeen = false, selfName = SELF_PLAYER_NAME, ledgerKey?: string, seats?: readonly string[]): MatchBadgeView[] {
+  return persistBadgeViews(evaluate(records, selfName, seats), selfName, ledgerKey, markSeen)
+}
+export function getPendingBadgeIds(selfName = SELF_PLAYER_NAME, ledgerKey?: string): string[] {
+  const state = readState(selfName, ledgerKey)
   return Object.keys(state.unlocked).filter((id) => !state.seen.includes(id))
 }
-export function markBadgesSeen(ids: string[], selfName = SELF_PLAYER_NAME) {
-  const state = readState(selfName)
+export function markBadgesSeen(ids: string[], selfName = SELF_PLAYER_NAME, ledgerKey?: string) {
+  const state = readState(selfName, ledgerKey)
   state.seen = Array.from(new Set([...state.seen, ...ids]))
-  try { Taro.setStorageSync(badgeKey(selfName), state) } catch { /* 下次可重新展示 */ }
+  try { Taro.setStorageSync(badgeKey(selfName, ledgerKey), state) } catch { /* 下次可重新展示 */ }
 }

@@ -2,6 +2,7 @@ import Taro from '@tarojs/taro'
 import { fetchCloudRecords, mergeRecords, syncRecordToCloud, type TrainRecord } from './cloud'
 import { pushLocalFavoritesToCloud, syncCloudFavoritesToLocal } from './favorite-service'
 import { syncCloudMatchesToLocal } from './match-service'
+import { syncCloudSoloToLocal } from './solo-match-service'
 
 /**
  * 微信小程序登录与用户信息管理
@@ -40,6 +41,7 @@ export function ensureLogin(): Promise<UserInfo | null> {
         pushLocalFavoritesToCloud()
       }
       void syncCloudMatchesToLocal()
+      void syncCloudSoloToLocal()
       return result.user
     } catch {
       // 网络失败可读已绑定缓存；明确的解绑由云端身份响应处理。
