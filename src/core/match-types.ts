@@ -29,6 +29,34 @@ export const SELF_PLAYER_NAME = 'HENING'
 export const FIXED_MATCH_PLAYERS = [SELF_PLAYER_NAME, 'WUYU', 'TANGXIANG', 'DUHAN'] as const
 export type PlayerName = typeof FIXED_MATCH_PLAYERS[number]
 
+export type SeatGender = 'male' | 'female'
+
+export const FIXED_PLAYER_GENDERS: Record<PlayerName, SeatGender> = {
+  HENING: 'male',
+  WUYU: 'male',
+  TANGXIANG: 'female',
+  DUHAN: 'female',
+}
+
+export function isSeatGender(value: unknown): value is SeatGender {
+  return value === 'male' || value === 'female'
+}
+
+export function resolveSeatGender(input: {
+  name: string
+  isSelf?: boolean
+  selfProfileGender?: SeatGender
+  seatGender?: SeatGender
+  isFixedTable?: boolean
+}): SeatGender {
+  if (input.isSelf && isSeatGender(input.selfProfileGender)) return input.selfProfileGender
+  if (isSeatGender(input.seatGender)) return input.seatGender
+  if (input.isFixedTable && input.name in FIXED_PLAYER_GENDERS) {
+    return FIXED_PLAYER_GENDERS[input.name as PlayerName]
+  }
+  return 'male'
+}
+
 /** 只接纳能确认身份的完整四人牌局；匿名座位不能推断成某位牌友。 */
 export function normalizeMatchPlayers(players: MatchPlayer[], selfName: string = SELF_PLAYER_NAME): MatchPlayer[] | undefined {
   if (!FIXED_MATCH_PLAYERS.includes(selfName as PlayerName) || !Array.isArray(players) || players.length !== FIXED_MATCH_PLAYERS.length) return undefined

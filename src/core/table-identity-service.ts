@@ -1,5 +1,5 @@
 import Taro from '@tarojs/taro'
-import { FIXED_MATCH_PLAYERS, type PlayerName } from './match-types'
+import { FIXED_MATCH_PLAYERS, type PlayerName, type SeatGender } from './match-types'
 
 export interface TableIdentity {
   playerName: PlayerName
@@ -11,6 +11,7 @@ export interface UserInfo {
   openid: string
   nickname: string
   avatarUrl: string
+  gender?: SeatGender
   identity?: TableIdentity | null
 }
 export interface TableStatus { identity: TableIdentity | null; players: { name: PlayerName; claimed: boolean }[] }

@@ -9,10 +9,76 @@
   letter-spacing: 4px;
 }
 
+.table-admin-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  margin: 10px 0 14px;
+}
+
 .table-admin {
-  margin-top: 8px;
   color: #1a5c2e;
   font-size: 24px;
+  font-weight: 600;
+}
+
+.table-gender-card {
+  margin-bottom: 20px;
+  padding: 20px 22px;
+  border-radius: 20px;
+  background: #fdfbf6;
+  border: 1px solid #e6dcc4;
+}
+
+.table-gender-title {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 22px;
+  color: #7c8478;
+}
+
+.table-gender-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee6d5;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.table-gender-name {
+  font-size: 26px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.table-gender-pills {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: #ebe7db;
+  gap: 4px;
+}
+
+.table-gender-opt {
+  padding: 6px 18px;
+  border-radius: 999px;
+  font-size: 22px;
+  font-weight: 600;
+  color: #7a8177;
+}
+
+.table-gender-opt.active.male {
+  background: #1a5c2e;
+  color: #fff;
+}
+
+.table-gender-opt.active.female {
+  background: #c86452;
+  color: #fff;
 }
 
 .delete-link {

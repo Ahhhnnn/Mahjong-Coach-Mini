@@ -25,6 +25,7 @@ exports.main = async (event, context) => {
     const exist = await db.collection('users').where({ _openid: OPENID }).get()
     if (exist.data.length > 0) {
       const user = exist.data[0]
+      const gender = user.gender === 'male' || user.gender === 'female' ? user.gender : undefined
       return {
         ok: true,
         user: {
@@ -32,6 +33,7 @@ exports.main = async (event, context) => {
           identity,
           nickname: user.nickname || '',
           avatarUrl: user.avatarUrl || '',
+          ...(gender ? { gender } : {}),
           createdAt: user.createdAt,
         },
       }

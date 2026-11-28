@@ -16,9 +16,9 @@ import {
   computeMatchStats, filterBySeason, getMatchSeasonAt, MATCH_SEASON_OPTIONS,
   type MatchSeason, type MatchSeasonPeriod,
 } from '../../core/match-stats-service'
-import { formatDelta, getSelfDelta } from '../../core/match-types'
+import { formatDelta, getSelfDelta, type SeatGender } from '../../core/match-types'
 import {
-  dissolveTable, findVisibleTable, listMyTables, releaseSeat, tableContext, TABLES_CHANGED, type TableSummary,
+  dissolveTable, findVisibleTable, listMyTables, releaseSeat, tableContext, TABLES_CHANGED, updateTableSeatGenders, type TableSummary,
 } from '../../core/table-directory-service'
 import './index.scss'
 
@@ -36,6 +36,8 @@ export default function TablePage() {
   const [season, setSeason] = useState<MatchSeason>(getMatchSeasonAt)
   const followCurrentSeason = useRef(true)
   const [expanded, setExpanded] = useState(false)
+  const [editingGenders, setEditingGenders] = useState(false)
+  const [savingGender, setSavingGender] = useState(false)
   const [version, setVersion] = useState(0)
   useLoad((opts) => { setTableId(opts?.id || '') })
   const load = async (id: string) => {
@@ -176,9 +178,46 @@ export default function TablePage() {
     <View className="records-page">
       {table.id !== 'fixed-four' && <Text className="section-title">{table.name}</Text>}
       {!!table.inviteCode && table.id !== 'fixed-four' && <Text className="table-code" onClick={() => { void Taro.setClipboardData({ data: table.inviteCode || '' }) }}>邀请码 {table.inviteCode} · 点击复制</Text>}
-      {table.role === 'admin' && table.id !== 'fixed-four' && table.players.filter((player) => player.claimed && player.name !== table.mySeat).map((player) => (
-        <Text key={player.name} className="table-admin" onClick={() => { void releaseSeat(table.id, player.name).then(() => load(table.id)) }}>解除 {player.name} 的座位</Text>
-      ))}
+      {table.role === 'admin' && table.id !== 'fixed-four' && (
+        <View className="table-admin-bar">
+          <Text className="table-admin" onClick={() => setEditingGenders((value) => !value)}>
+            {editingGenders ? '收起座位性别设置' : '调整座位性别'}
+          </Text>
+          {table.players.filter((player) => player.claimed && player.name !== table.mySeat).map((player) => (
+            <Text key={player.name} className="table-admin" onClick={() => { void releaseSeat(table.id, player.name).then(() => load(table.id)) }}>解除 {player.name} 的座位</Text>
+          ))}
+        </View>
+      )}
+      {table.role === 'admin' && table.id !== 'fixed-four' && editingGenders && (
+        <View className="table-gender-card">
+          <Text className="table-gender-title">座位性别（供未设个人资料的牌友显示）</Text>
+          {table.players.map((player) => {
+            const currentGender: SeatGender = player.gender === 'female' ? 'female' : 'male'
+            const toggle = async (next: SeatGender) => {
+              if (savingGender || currentGender === next) return
+              setSavingGender(true)
+              try {
+                const updated = await updateTableSeatGenders(table.id, { [player.name]: next })
+                setTable(updated)
+                Taro.showToast({ title: `${player.name} 已设为${next === 'male' ? '男' : '女'}`, icon: 'success' })
+              } catch (error) {
+                Taro.showToast({ title: error instanceof Error ? error.message : '保存失败', icon: 'none' })
+              } finally {
+                setSavingGender(false)
+              }
+            }
+            return (
+              <View key={player.name} className="table-gender-row">
+                <Text className="table-gender-name">{player.name}{player.name === table.mySeat ? '（我）' : ''}</Text>
+                <View className="table-gender-pills">
+                  <Text className={`table-gender-opt ${currentGender === 'male' ? 'active male' : ''}`} onClick={() => { void toggle('male') }}>男</Text>
+                  <Text className={`table-gender-opt ${currentGender === 'female' ? 'active female' : ''}`} onClick={() => { void toggle('female') }}>女</Text>
+                </View>
+              </View>
+            )
+          })}
+        </View>
+      )}
       {syncState.pending > 0 && <Text className="records-empty-text">{syncState.pending} 项变更待同步。</Text>}
       {syncState.conflicts.map((item) => <Text key={item.id} className="records-empty-text" onClick={() => { discardMatchConflict(item.id, ctx); setVersion((value) => value + 1) }}>{item.message} · 点此放弃草稿</Text>)}
       <View className="season-selector">

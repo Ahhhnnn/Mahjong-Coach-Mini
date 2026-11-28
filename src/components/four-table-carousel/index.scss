@@ -1,0 +1,391 @@
+.four-carousel-wrap {
+  margin-bottom: 16px;
+}
+
+.four-single-wrap {
+  width: 100%;
+}
+
+.four-table-swiper {
+  margin: 0 -24px;
+  height: 780px;
+}
+
+.four-swiper-item {
+  box-sizing: border-box;
+  padding: 6px 12px 24px;
+  display: flex;
+  align-items: flex-start;
+}
+
+.four-table-card {
+  width: 100%;
+  background: #f9f7ea;
+  border-radius: 28px;
+  border: 2px solid #e6dcc4;
+  box-shadow: 0 10px 28px rgba(22, 74, 52, 0.08);
+  overflow: hidden;
+  transition: transform 0.24s ease, opacity 0.24s ease;
+  box-sizing: border-box;
+}
+
+.four-table-card.is-dimmed {
+  transform: scale(0.95);
+  opacity: 0.86;
+}
+
+.four-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 8px;
+}
+
+.four-table-tag {
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: #eef4ef;
+}
+
+.four-table-tag.is-fixed {
+  background: linear-gradient(135deg, #edf4ee 0%, #e4efe6 100%);
+}
+
+.four-table-tag-text {
+  font-size: 21px;
+  font-weight: 600;
+  color: #1a5c2e;
+}
+
+.four-table-season {
+  font-size: 22px;
+  color: #8b8f82;
+}
+
+.four-table-stage {
+  position: relative;
+  width: 580px;
+  height: 604px;
+  margin: 0 auto;
+  overflow: visible;
+  background: #f9f7ea;
+}
+
+.four-table-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 580px;
+  height: 580px;
+  z-index: 1;
+  display: block;
+}
+
+.four-seat-avatar {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+}
+
+.four-seat-avatar.avatar-top {
+  left: 202px;
+  top: 22px;
+  width: 180px;
+  height: 176px;
+  z-index: 2;
+}
+
+.four-seat-avatar.avatar-left {
+  left: 36px;
+  top: 158px;
+  width: 190px;
+  height: 280px;
+  z-index: 2;
+}
+
+.four-seat-avatar.avatar-right {
+  left: 354px;
+  top: 158px;
+  width: 190px;
+  height: 280px;
+  z-index: 2;
+}
+
+.four-self-halo {
+  position: absolute;
+  left: 292px;
+  top: 444px;
+  width: 184px;
+  height: 184px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(246, 224, 156, 0.36) 0%, rgba(243, 212, 134, 0.2) 56%, rgba(243, 212, 134, 0) 76%);
+  box-shadow: 0 0 28px rgba(235, 198, 108, 0.32);
+  border: 2px solid rgba(242, 210, 128, 0.55);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.four-seat-avatar.avatar-bottom {
+  left: 200px;
+  top: 324px;
+  width: 184px;
+  height: 240px;
+  z-index: 4;
+}
+
+.four-center-plaque {
+  position: absolute;
+  top: 276px;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  min-width: 192px;
+  max-width: 236px;
+  padding: 12px 16px 10px;
+  border-radius: 16px;
+  background: rgba(15, 58, 39, 0.94);
+  border: 2px solid rgba(222, 194, 129, 0.72);
+  box-shadow: 0 6px 18px rgba(8, 32, 22, 0.34);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.four-plaque-name {
+  font-size: 28px;
+  font-weight: 800;
+  color: #f4dca0;
+  line-height: 1.25;
+  letter-spacing: 2px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.four-plaque-meta {
+  margin-top: 4px;
+  font-size: 19px;
+  color: #c9ddd1;
+  line-height: 1.2;
+}
+
+.four-plaque-cta {
+  margin-top: 8px;
+  padding: 5px 14px 5px 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f3dc9f 0%, #dfc077 100%);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.four-plaque-cta-text {
+  font-size: 19px;
+  font-weight: 700;
+  color: #2c2414;
+  line-height: 1;
+}
+
+.four-seat-badge {
+  position: absolute;
+  z-index: 6;
+  min-width: 128px;
+  max-width: 192px;
+  padding: 8px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid #e6dfd0;
+  box-shadow: 0 4px 12px rgba(24, 42, 30, 0.08);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.four-seat-badge.is-self {
+  background: linear-gradient(145deg, #fffdf7 0%, #fbf3dc 100%);
+  border: 2px solid #dfbe76;
+  box-shadow: 0 6px 16px rgba(196, 152, 62, 0.22);
+}
+
+/* 上家：显示在顶部人物右边 */
+.four-seat-badge.pos-top {
+  top: 56px;
+  left: 356px;
+}
+
+/* 左家：显示在左侧人物正下方 */
+.four-seat-badge.pos-left {
+  top: 432px;
+  left: 8px;
+}
+
+/* 右家：显示在右侧人物正下方 */
+.four-seat-badge.pos-right {
+  top: 432px;
+  right: 8px;
+}
+
+/* 下家（我）：显示在底部人物右边，且与右家下方标签错开不重叠 */
+.four-seat-badge.pos-bottom {
+  top: 516px;
+  left: 344px;
+}
+
+.four-seat-crown {
+  position: absolute;
+  top: -12px;
+  right: -8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #fff1c2 0%, #f0c966 100%);
+  border: 1px solid #d7a83c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(176, 132, 34, 0.25);
+}
+
+.four-seat-name {
+  display: block;
+  font-size: 20px;
+  font-weight: 600;
+  color: #424a43;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.four-seat-badge.is-self .four-seat-name {
+  color: #5c4314;
+  font-weight: 700;
+}
+
+.four-seat-score {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 23px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.four-seat-score.pos {
+  color: #157a37;
+  background: #eaf7ee;
+}
+
+.four-seat-score.neg {
+  color: #d6382b;
+  background: #fdeeed;
+}
+
+.four-seat-score.zero {
+  color: #7d8478;
+  background: #f2f1ec;
+}
+
+.four-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px 20px;
+  border-top: 1px solid #eee6d5;
+  background: #fbf8f0;
+}
+
+.four-foot-meta {
+  font-size: 22px;
+  color: #5f665d;
+  font-weight: 500;
+}
+
+.four-foot-right {
+  font-size: 22px;
+  color: #1a5c2e;
+  font-weight: 600;
+}
+
+.four-carousel-dots {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.four-dots-track {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.four-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #d8d1be;
+  transition: width 0.22s ease, background-color 0.22s ease;
+}
+
+.four-dot.active {
+  width: 34px;
+  background: #1a5c2e;
+}
+
+.four-dots-hint {
+  font-size: 20px;
+  color: #8b9488;
+}
+
+.four-add-entry {
+  margin-top: 20px;
+  padding: 20px 24px;
+  border-radius: 999px;
+  background: #fdfbf6;
+  border: 2px dashed #d3c7ad;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.four-add-entry-text {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1a5c2e;
+}
+
+.four-carousel-empty {
+  margin-bottom: 16px;
+}
+
+.four-empty-card {
+  background: #fff;
+  border-radius: 24px;
+  padding: 44px 32px;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.four-empty-title {
+  display: block;
+  font-size: 32px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+}
+
+.four-empty-desc {
+  display: block;
+  font-size: 24px;
+  color: #8b9488;
+  line-height: 1.5;
+  margin-bottom: 24px;
+}

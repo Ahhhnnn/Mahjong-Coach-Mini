@@ -38,7 +38,9 @@ function server() {
       where: (next) => query(next, offset, limit, order), skip: (next) => query(fields, next, limit, order), limit: (next) => query(fields, offset, next, order),
       orderBy: (field, direction) => query(fields, offset, limit, { field, direction }),
       get: async () => {
-        const items = [...documents.values()].filter((d) => Object.entries(fields).every(([k, v]) => v?.operator === 'lt' ? d[k] < v.value : d[k] === v))
+        const items = [...documents.values()].filter((d) => Object.entries(fields).every(([k, v]) => (
+          v?.operator === 'lt' ? d[k] < v.value : v?.operator === 'in' ? Array.isArray(v.value) && v.value.includes(d[k]) : d[k] === v
+        )))
         if (order) items.sort((a, b) => String(a[order.field]).localeCompare(String(b[order.field])) * (order.direction === 'desc' ? -1 : 1))
         return { data: clone(items.slice(offset, offset + limit)) }
       },
@@ -53,7 +55,7 @@ function server() {
       add: async ({ data }) => { const id = data._id || String(documents.size); documents.set(id, clone(data)); return { _id: id } },
     }
   }
-  const db = { command: { lt: (value) => ({ operator: 'lt', value }) }, createCollection: async (name) => { docs(name) }, collection, serverDate: () => ({ serverDate: true }), runTransaction: (callback) => {
+  const db = { command: { lt: (value) => ({ operator: 'lt', value }), in: (value) => ({ operator: 'in', value }) }, createCollection: async (name) => { docs(name) }, collection, serverDate: () => ({ serverDate: true }), runTransaction: (callback) => {
     const operation = tail.then(() => callback({ collection }))
     tail = operation.catch(() => {})
     return operation

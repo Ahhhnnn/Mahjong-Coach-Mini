@@ -1,9 +1,50 @@
 const { randomBytes } = require('crypto')
 const TABLE_ID = 'fixed-four'
 const FIXED_NAMES = ['HENING', 'WUYU', 'TANGXIANG', 'DUHAN']
+const FIXED_GENDERS = { HENING: 'male', WUYU: 'male', TANGXIANG: 'female', DUHAN: 'female' }
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const { mirrorStored, seedTable, safe } = require('./solo-mirror.js')
-const DIRECTORY = new Set(['createTable', 'listTables', 'previewTable', 'claimSeat', 'releaseSeat', 'dissolveTable', 'seedSolo'])
+const DIRECTORY = new Set(['createTable', 'listTables', 'previewTable', 'claimSeat', 'releaseSeat', 'dissolveTable', 'updateSeatGenders', 'seedSolo'])
+
+function validGender(value) {
+  return value === 'male' || value === 'female' ? value : ''
+}
+
+function cleanSeatGenders(input, seats) {
+  const result = {}
+  if (!input || typeof input !== 'object') return result
+  for (const name of seats) {
+    const gender = validGender(input[name])
+    if (gender) result[name] = gender
+  }
+  return result
+}
+
+async function loadUserGenders(db, openids) {
+  const unique = [...new Set(openids.filter((value) => typeof value === 'string' && value))]
+  const map = new Map()
+  if (!unique.length) return map
+  for (let i = 0; i < unique.length; i += 20) {
+    const batch = unique.slice(i, i + 20)
+    try {
+      const result = await db.collection('users').where({ _openid: db.command.in(batch) }).limit(20).get()
+      for (const user of result.data || []) {
+        const gender = validGender(user?.gender)
+        if (user?._openid && gender) map.set(user._openid, gender)
+      }
+    } catch { /* 兼容 users 集合尚不存在或无权限查询 */ }
+  }
+  return map
+}
+
+function resolvePlayerGender(table, name, userGenders) {
+  const memberOpenid = table?.members?.[name]?.openid
+  if (memberOpenid && userGenders?.has(memberOpenid)) return userGenders.get(memberOpenid)
+  const preset = validGender(table?.seatGenders?.[name])
+  if (preset) return preset
+  if ((table?.id || TABLE_ID) === TABLE_ID && FIXED_GENDERS[name]) return FIXED_GENDERS[name]
+  return 'male'
+}
 
 function cleanLabel(value, max) {
   if (typeof value !== 'string') return ''
@@ -21,17 +62,21 @@ function memberOf(table, openid, seats) {
   }
 }
 
-function summary(table, identity) {
+function summary(table, identity, userGenders) {
   const seats = table.seats || FIXED_NAMES
   return {
     id: table.id || TABLE_ID,
-    name: table.name || '常聚牌桌',
+    name: table.name || '四个敌人',
     seats,
     mySeat: identity.playerName,
     role: identity.role,
     bindingId: identity.bindingId,
     inviteCode: table.inviteCode || '',
-    players: seats.map((name) => ({ name, claimed: !!table.members?.[name]?.openid })),
+    players: seats.map((name) => ({
+      name,
+      claimed: !!table.members?.[name]?.openid,
+      gender: resolvePlayerGender(table, name, userGenders),
+    })),
   }
 }
 
@@ -55,10 +100,10 @@ async function freshCode(db) {
 
 async function handleDirectory({ event, db, openid, readDoc, fail, pages, hash }) {
   if (event.action === 'listTables') {
-    const tables = []
+    const rawEntries = []
     const fixed = await readDoc(db.collection('match_tables').doc(TABLE_ID))
     const fixedIdentity = fixed?.ready ? memberOf(fixed, openid, FIXED_NAMES) : null
-    if (fixedIdentity) tables.push(summary({ ...fixed, id: TABLE_ID, name: '常聚牌桌' }, fixedIdentity))
+    if (fixedIdentity) rawEntries.push({ table: { ...fixed, id: TABLE_ID, name: '四个敌人', seats: FIXED_NAMES }, identity: fixedIdentity })
     const memberships = await pages('table_memberships', { openid })
     for (const membership of memberships) {
       if (!membership?.tableId || membership.tableId === TABLE_ID) continue
@@ -66,9 +111,11 @@ async function handleDirectory({ event, db, openid, readDoc, fail, pages, hash }
       if (!table?.ready || !Array.isArray(table.seats)) continue
       const identity = memberOf({ ...table, id: membership.tableId }, openid, table.seats)
       if (!identity || identity.bindingId !== membership.bindingId) continue
-      tables.push(summary({ ...table, id: membership.tableId }, identity))
+      rawEntries.push({ table: { ...table, id: membership.tableId }, identity })
     }
-    return { ok: true, tables }
+    const openids = rawEntries.flatMap(({ table }) => (table.seats || []).map((name) => table.members?.[name]?.openid))
+    const userGenders = await loadUserGenders(db, openids)
+    return { ok: true, tables: rawEntries.map(({ table, identity }) => summary(table, identity, userGenders)) }
   }
   if (event.action === 'seedSolo') {
     let mirrored = 0
@@ -93,11 +140,16 @@ async function handleDirectory({ event, db, openid, readDoc, fail, pages, hash }
     const found = await db.collection('match_tables').where({ inviteCode: code, ready: true }).limit(1).get()
     const table = found.data[0]
     if (!table?.id || table.id === TABLE_ID || !Array.isArray(table.seats)) return fail('INVALID', '没有找到这张桌子')
+    const userGenders = await loadUserGenders(db, table.seats.map((name) => table.members?.[name]?.openid))
     return {
       ok: true,
       table: {
         id: table.id, name: table.name, inviteCode: code,
-        players: table.seats.map((name) => ({ name, claimed: !!table.members?.[name]?.openid })),
+        players: table.seats.map((name) => ({
+          name,
+          claimed: !!table.members?.[name]?.openid,
+          gender: resolvePlayerGender(table, name, userGenders),
+        })),
       },
     }
   }
@@ -120,22 +172,30 @@ async function handleDirectory({ event, db, openid, readDoc, fail, pages, hash }
     const members = {}
     seats.forEach((seat) => { members[seat] = { openid: null, bindingId: null } })
     members[mySeat] = { openid, bindingId, claimedAt: now }
+    const seatGenders = cleanSeatGenders(event.seatGenders, seats)
     const table = {
-      id, ready: true, name, seats, members, inviteCode, adminOpenid: openid, createdBy: openid, createdAt: now,
+      id, ready: true, name, seats, seatGenders, members, inviteCode, adminOpenid: openid, createdBy: openid, createdAt: now,
     }
     await db.collection('match_tables').doc(id).set({ data: table })
     await db.collection('table_memberships').doc(hash(`${openid}:${id}`)).set({ data: {
       id: hash(`${openid}:${id}`), openid, tableId: id, playerName: mySeat, bindingId, role: 'admin', updatedAt: now,
     } })
-    return { ok: true, table: summary(table, { playerName: mySeat, bindingId, role: 'admin', tableId: id }) }
+    const userGenders = await loadUserGenders(db, [openid])
+    return { ok: true, table: summary(table, { playerName: mySeat, bindingId, role: 'admin', tableId: id }, userGenders) }
   }
-  if (!['claimSeat', 'releaseSeat', 'dissolveTable'].includes(event.action)) return fail('INVALID', '未知操作')
+  if (!['claimSeat', 'releaseSeat', 'dissolveTable', 'updateSeatGenders'].includes(event.action)) return fail('INVALID', '未知操作')
   if (event.tableId === TABLE_ID || !event.tableId) return fail('INVALID', '常聚牌桌请到身份页认领')
   const changed = await db.runTransaction(async (transaction) => {
     const ref = transaction.collection('match_tables').doc(event.tableId)
     const current = await readDoc(ref)
     if (!current?.ready || !Array.isArray(current.seats)) return fail('INVALID', '这张桌子不存在')
     const mine = memberOf({ ...current, id: event.tableId }, openid, current.seats)
+    if (event.action === 'updateSeatGenders') {
+      if (mine?.role !== 'admin') return fail('FORBIDDEN', '只有创建者可以调整座位性别')
+      const nextGenders = { ...(current.seatGenders || {}), ...cleanSeatGenders(event.seatGenders, current.seats) }
+      await ref.update({ data: { seatGenders: nextGenders, updatedAt: db.serverDate() } })
+      return { ok: true, table: { ...current, id: event.tableId, seatGenders: nextGenders }, identity: mine }
+    }
     if (event.action === 'dissolveTable') {
       if (mine?.role !== 'admin') return fail('FORBIDDEN', '只有创建者可以解散空桌子')
       const matches = await pages('table_matches', { tableId: event.tableId })
@@ -173,9 +233,21 @@ async function handleDirectory({ event, db, openid, readDoc, fail, pages, hash }
     if (previous?.openid) await transaction.collection('table_memberships').doc(hash(`${previous.openid}:${event.tableId}`)).remove()
     return { ok: true, table: summary({ ...current, id: event.tableId, members }, mine) }
   })
-  if (event.action === 'claimSeat' && changed?.ok) {
+  if (event.action === 'updateSeatGenders' && changed?.ok) {
+    const openids = (changed.table.seats || []).map((name) => changed.table.members?.[name]?.openid)
+    const userGenders = await loadUserGenders(db, openids)
+    return { ok: true, table: summary(changed.table, changed.identity, userGenders) }
+  }
+  if ((event.action === 'claimSeat' || event.action === 'releaseSeat') && changed?.ok && changed?.table) {
     const latest = await readDoc(db.collection('match_tables').doc(event.tableId))
-    if (latest?.ready) await safe(() => seedTable({ db, readDoc, hash, pages, table: latest, tableId: event.tableId }))
+    if (latest?.ready) {
+      if (event.action === 'claimSeat') await safe(() => seedTable({ db, readDoc, hash, pages, table: latest, tableId: event.tableId }))
+      const latestIdentity = memberOf({ ...latest, id: event.tableId }, openid, latest.seats || [])
+      if (latestIdentity) {
+        const userGenders = await loadUserGenders(db, (latest.seats || []).map((name) => latest.members?.[name]?.openid))
+        return { ok: true, table: summary({ ...latest, id: event.tableId }, latestIdentity, userGenders) }
+      }
+    }
   }
   return changed
 }

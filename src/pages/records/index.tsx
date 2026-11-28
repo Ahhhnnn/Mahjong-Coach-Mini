@@ -3,13 +3,13 @@ import { View, Text, Picker } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Button, Tabs } from '@taroify/core'
 import { ArrowDown, Plus } from '@taroify/icons'
+import FourTableCarousel from '../../components/four-table-carousel'
 import MatchTrendChart from '../../components/match-trend-chart'
 import MatchBadgeWall from '../../components/match-badge-wall'
 import { ensureLogin, getCachedUser } from '../../core/auth'
 import { discardSoloConflict, getSoloMatch, getSoloSyncState, listSoloMatches, SOLO_CHANGED, soloScope, syncCloudSoloToLocal } from '../../core/solo-match-service'
 import { soloLedgerKey, updateSoloBadges } from '../../core/solo-badge-service'
 import { listMatches, syncCloudMatchesToLocal, MATCHES_CHANGED } from '../../core/match-service'
-import { evaluateMatchBadges } from '../../core/match-badge-service'
 import {
   computeMatchStats, filterBySeason, getMatchSeasonAt, MATCH_SEASON_OPTIONS,
   type MatchSeason, type MatchSeasonPeriod,
@@ -59,8 +59,9 @@ export default function RecordsPage() {
     if (getCachedUser()?.openid) {
       void seedPersonalScores().catch(() => undefined).then(() => syncCloudSoloToLocal()).then(refresh)
       void listMyTables().then(async () => {
-        setTables(listVisibleTables())
-        await Promise.all(next.map((table) => syncCloudMatchesToLocal(table.id === 'fixed-four' ? undefined : tableContext(table))))
+        const visible = listVisibleTables()
+        setTables(visible)
+        await Promise.all(visible.map((table) => syncCloudMatchesToLocal(table.id === 'fixed-four' ? undefined : tableContext(table))))
         refresh()
       }).catch(() => { /* 离线继续看本地桌子和单人缓存 */ })
     }
@@ -123,9 +124,45 @@ export default function RecordsPage() {
   )
   return (
     <View className="records-page">
-      <View className="lens-switch" role="tablist">
-        <Text className={`lens-option ${lens === 'solo' ? 'active' : ''}`} onClick={() => chooseLens('solo')}>单人</Text>
-        <Text className={`lens-option ${lens === 'four' ? 'active' : ''}`} onClick={() => chooseLens('four')}>四人</Text>
+      <View className="records-header-row">
+        <Text className="records-header-title">{lens === 'solo' ? '个人账本' : '好友牌桌'}</Text>
+        <View className="dice-switch-bar" role="tablist">
+          <Text
+            className={`dice-switch-label ${lens === 'solo' ? 'active' : ''}`}
+            onClick={() => chooseLens('solo')}
+          >
+            个人
+          </Text>
+          <View
+            className={`dice-switch-track ${lens === 'four' ? 'is-four' : 'is-solo'}`}
+            onClick={() => chooseLens(lens === 'solo' ? 'four' : 'solo')}
+            role="switch"
+            aria-checked={lens === 'four'}
+            aria-label="切换个人账本与好友牌桌"
+          >
+            <View className="dice-track-inner" />
+            <View className={`dice-knob ${lens === 'four' ? 'is-four' : 'is-solo'}`}>
+              {lens === 'four' ? (
+                <View className="dice-face dice-face-four">
+                  <View className="dice-pip" />
+                  <View className="dice-pip" />
+                  <View className="dice-pip" />
+                  <View className="dice-pip" />
+                </View>
+              ) : (
+                <View className="dice-face dice-face-one">
+                  <View className="dice-pip dice-pip-one" />
+                </View>
+              )}
+            </View>
+          </View>
+          <Text
+            className={`dice-switch-label ${lens === 'four' ? 'active' : ''}`}
+            onClick={() => chooseLens('four')}
+          >
+            牌桌
+          </Text>
+        </View>
       </View>
       <View className="records-identity-row">
         <Text>{lens === 'solo' ? '单人积分 · 云端保存' : '四人牌桌 · 选一桌查看'}</Text>
@@ -155,7 +192,7 @@ export default function RecordsPage() {
         </Tabs>
         <View className="season-caption"><Text className="season-dates">{seasonOption.dates}</Text><Text className="season-status">{isCurrentSeason ? '当前赛季' : season.period === 'all' ? '年度总览' : '季度战绩'}</Text></View>
       </View>
-      {lens === 'four' ? <FourTables season={season} seasonLabel={seasonLabel} tables={tables} /> : <>
+      {lens === 'four' ? <FourTableCarousel season={season} seasonLabel={seasonLabel} seasonShort={seasonOption.label} tables={tables} /> : <>
         <View className="hero-card">
           <Text className="hero-season">{seasonLabel}</Text>
           <Text className="hero-cum-label">{season.period === 'all' ? '全年' : '赛季'}累计积分</Text>
@@ -209,33 +246,6 @@ export default function RecordsPage() {
           {filtered.length > 15 && <View className="records-expand" onClick={() => setExpanded((value) => !value)}><Text>{expanded ? '收起历史记录' : `展开全部 ${filtered.length} 场`}</Text></View>}
         </View>
       </>}
-    </View>
-  )
-}
-
-function FourTables({ season, seasonLabel, tables }: { season: MatchSeason; seasonLabel: string; tables: TableSummary[] }) {
-  return (
-    <View className="section-card section-card-last">
-      <View className="section-head"><Text className="section-title">我的桌子</Text><Text className="ranking-scope">{seasonLabel}</Text></View>
-      {!tables.length && <View className="records-list-empty">
-        <Text className="records-empty-text">还没有入座。可以新建一桌，或用邀请码加入朋友的桌子。</Text>
-        <Button color="primary" shape="round" onClick={() => Taro.navigateTo({ url: '/pages/table-create/index' })}>添加桌子</Button>
-      </View>}
-      {tables.map((table) => {
-        const ctx = table.id === 'fixed-four' ? undefined : tableContext(table)
-        const records = listMatches(ctx)
-        const stats = computeMatchStats(records, { season, playerName: table.mySeat, seats: table.id === 'fixed-four' ? undefined : table.seats })
-        const mine = evaluateMatchBadges(records, table.mySeat, table.id === 'fixed-four' ? undefined : table.seats).filter((badge) => badge.unlockedAt).length
-        return <View key={table.id} className="table-card" onClick={() => Taro.navigateTo({ url: `/pages/table/index?id=${encodeURIComponent(table.id)}` })}>
-          <View className="table-card-main">
-            <Text className="table-card-name">{table.name}</Text>
-            <Text className="table-card-seats">{table.seats.join(' · ')}</Text>
-            <Text className="table-card-meta">我是 {table.mySeat} · {mine} 枚本桌荣誉</Text>
-          </View>
-          <Text className={`table-card-score ${stats.cumulative >= 0 ? 'pos' : 'neg'}`}>{formatDelta(stats.cumulative)}</Text>
-        </View>
-      })}
-      {!!tables.length && <View className="records-expand" onClick={() => Taro.navigateTo({ url: '/pages/table-create/index' })}><Text>添加桌子或输入邀请码</Text></View>}
     </View>
   )
 }

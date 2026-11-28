@@ -97,18 +97,52 @@
       height: 52px;
     }
 
+    .profile-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
     .level-tag {
       display: inline-flex;
       align-items: center;
       background: rgba(255, 255, 255, 0.22);
       border-radius: 20px;
       padding: 4px 16px;
-      margin-bottom: 14px;
 
       .level-tag-text {
         font-size: 22px;
         color: #fff;
         line-height: 1.4;
+      }
+    }
+
+    .gender-switch {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.16);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 999px;
+      padding: 3px;
+      gap: 4px;
+
+      .gender-opt {
+        min-width: 48px;
+        padding: 3px 14px;
+        border-radius: 999px;
+        font-size: 21px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.78);
+        text-align: center;
+        line-height: 1.3;
+
+        &.active {
+          background: #fff;
+          color: #1a5c2e;
+          font-weight: 700;
+        }
       }
     }
 

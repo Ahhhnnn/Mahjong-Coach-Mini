@@ -13,7 +13,8 @@ exports.main = async (event, context) => {
     return { ok: false, error: '无法获取用户身份' }
   }
 
-  const { avatarUrl, nickname } = event
+  const { avatarUrl, nickname, gender } = event
+  const validGender = gender === 'male' || gender === 'female' ? gender : undefined
 
   try {
     const updateData = { updatedAt: db.serverDate() }
@@ -23,32 +24,36 @@ exports.main = async (event, context) => {
     if (typeof nickname === 'string' && nickname.trim()) {
       updateData.nickname = nickname.trim().slice(0, 20)
     }
+    if (validGender) {
+      updateData.gender = validGender
+    }
 
-    // 更新 users 集合中当前用户的记录
-    const result = await db
-      .collection('users')
-      .where({ _openid: OPENID })
-      .update({ data: updateData })
-
-    if (result.stats.updated === 0) {
-      // 用户记录不存在，创建一条
+    // 读取已有记录，确保返回完整资料且不覆盖未传入字段
+    const exist = await db.collection('users').where({ _openid: OPENID }).limit(1).get()
+    const current = exist.data[0]
+    if (current) {
+      await db.collection('users').where({ _openid: OPENID }).update({ data: updateData })
+    } else {
       await db.collection('users').add({
         data: {
           _openid: OPENID,
           nickname: (nickname || '').trim().slice(0, 20) || '',
           avatarUrl: avatarUrl || '',
+          ...(validGender ? { gender: validGender } : {}),
           createdAt: db.serverDate(),
           ...updateData,
         },
       })
     }
 
+    const finalGender = validGender || (current?.gender === 'male' || current?.gender === 'female' ? current.gender : undefined)
     return {
       ok: true,
       user: {
         openid: OPENID,
-        nickname: updateData.nickname || '',
-        avatarUrl: updateData.avatarUrl || '',
+        nickname: updateData.nickname ?? current?.nickname ?? '',
+        avatarUrl: updateData.avatarUrl ?? current?.avatarUrl ?? '',
+        ...(finalGender ? { gender: finalGender } : {}),
       },
     }
   } catch (e) {

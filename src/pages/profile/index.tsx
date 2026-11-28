@@ -23,7 +23,7 @@ import { listFavorites } from '../../core/favorite-service'
 import { getLevelTitle } from '../../core/train-stats-service'
 import { listSoloMatches, SOLO_CHANGED, soloScope } from '../../core/solo-match-service'
 import { computeMatchStats } from '../../core/match-stats-service'
-import { formatDelta, SOLO_SELF_NAME, soloToMatchRecord } from '../../core/match-types'
+import { FIXED_PLAYER_GENDERS, formatDelta, isSeatGender, SOLO_SELF_NAME, soloToMatchRecord, type SeatGender } from '../../core/match-types'
 import { useTableIdentity } from '../../hooks/use-table-identity'
 import { useEffect } from 'react'
 import mascotImg from '../../assets/mascot/panda.png'
@@ -161,6 +161,28 @@ export default function ProfilePage() {
     }
   }
 
+  const effectiveGender: SeatGender | undefined = isSeatGender(userInfo?.gender)
+    ? userInfo.gender
+    : identity ? FIXED_PLAYER_GENDERS[identity.playerName] : undefined
+
+  const handleSelectGender = async (gender: SeatGender) => {
+    if (effectiveGender === gender && userInfo?.gender === gender) return
+    Taro.showLoading({ title: '保存中…' })
+    try {
+      const updated = await updateUserProfile({ gender })
+      if (updated) {
+        setUserInfo(updated)
+        Taro.showToast({ title: `已设为${gender === 'male' ? '男' : '女'}`, icon: 'success' })
+      } else {
+        Taro.showToast({ title: '保存失败，请稍后重试', icon: 'none' })
+      }
+    } catch {
+      Taro.showToast({ title: '保存失败，请重试', icon: 'none' })
+    } finally {
+      Taro.hideLoading()
+    }
+  }
+
   const levelProgress = (stats.xp % 100) / 100 * 100
   const displayName = loggedIn ? (userInfo?.nickname || '麻将学员') : '未登录'
   const goRecords = () => Taro.switchTab({ url: '/pages/records/index' })
@@ -223,10 +245,26 @@ export default function ProfilePage() {
                     </Text>
                   )}
                 </View>
-                <View className="level-tag">
-                  <Text className="level-tag-text">
-                    Lv.{stats.level} {getLevelTitle(stats.level)}
-                  </Text>
+                <View className="profile-meta-row">
+                  <View className="level-tag">
+                    <Text className="level-tag-text">
+                      Lv.{stats.level} {getLevelTitle(stats.level)}
+                    </Text>
+                  </View>
+                  <View className="gender-switch" role="radiogroup" aria-label="设置我的性别">
+                    <Text
+                      className={`gender-opt ${effectiveGender === 'male' ? 'active' : ''}`}
+                      onClick={() => { void handleSelectGender('male') }}
+                    >
+                      男
+                    </Text>
+                    <Text
+                      className={`gender-opt ${effectiveGender === 'female' ? 'active' : ''}`}
+                      onClick={() => { void handleSelectGender('female') }}
+                    >
+                      女
+                    </Text>
+                  </View>
                 </View>
                 <View className="level-bar">
                   <View className="level-fill" style={{ width: `${levelProgress}%` }} />

@@ -119,6 +119,16 @@ test('重复初始化不会创建多个实例，旧 Canvas 路径使用 DPR 1', 
   h.ready(); h.init(initialize); h.init(initialize); h.flush()
   assert.equal(calls, 1)
 })
+test('WxCanvas 提供 ECharts 卸载所需的 removeEventListener 方法', () => {
+  const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/components/ec-canvas/wx-canvas.js'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText
+  const module = { exports: {} }
+  vm.runInNewContext(source, { module, exports: module.exports })
+  const WxCanvas = module.exports.default
+  const canvas = new WxCanvas({}, 'test', true, { width: 330, height: 260 })
+  assert.equal(typeof canvas.addEventListener, 'function')
+  assert.equal(typeof canvas.removeEventListener, 'function')
+  assert.doesNotThrow(() => canvas.removeEventListener('mousedown', () => {}))
+})
 test('趋势图渐变色使用真机兼容的 rgba，保留四人曲线和全部时间点', () => {
   const { load, seeds } = require('./helpers/table-harness.cjs')
   class LinearGradient { constructor(x, y, x2, y2, colorStops) { this.colorStops = colorStops } }

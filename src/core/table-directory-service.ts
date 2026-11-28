@@ -1,6 +1,15 @@
 import Taro from '@tarojs/taro'
 import { cacheUser, getCachedUser, getTableIdentity } from './table-identity-service'
-import { FIXED_MATCH_PLAYERS, type PlayerName, type TablePlayContext } from './match-types'
+import {
+  FIXED_MATCH_PLAYERS, FIXED_PLAYER_GENDERS, resolveSeatGender,
+  type PlayerName, type SeatGender, type TablePlayContext,
+} from './match-types'
+
+export interface TablePlayerSummary {
+  name: string
+  claimed: boolean
+  gender?: SeatGender
+}
 
 export interface TableSummary {
   id: string
@@ -10,14 +19,14 @@ export interface TableSummary {
   role: 'admin' | 'member'
   bindingId: string
   inviteCode?: string
-  players: { name: string; claimed: boolean }[]
+  players: TablePlayerSummary[]
 }
 
 export interface TablePreview {
   id: string
   name: string
   inviteCode: string
-  players: { name: string; claimed: boolean }[]
+  players: TablePlayerSummary[]
 }
 
 export const TABLES_CHANGED = 'table-directory-changed'
@@ -33,16 +42,47 @@ export function listCachedTables(): TableSummary[] {
   return Array.isArray(raw) ? raw : []
 }
 
-/** 云端桌子名单还没回来时，已认领的常聚牌桌也要先显示出来。 */
+export const DEFAULT_FIXED_TABLE_NAME = '四个敌人'
+
+function normalizeTableSummary(table: TableSummary): TableSummary {
+  const isFixed = table.id === 'fixed-four'
+  const selfProfileGender = getCachedUser()?.gender
+  const existingMap = new Map((table.players || []).map((player) => [player.name, player]))
+  const players: TablePlayerSummary[] = table.seats.map((name) => {
+    const existing = existingMap.get(name)
+    return {
+      name,
+      claimed: !!existing?.claimed,
+      gender: resolveSeatGender({
+        name,
+        isSelf: name === table.mySeat,
+        selfProfileGender,
+        seatGender: existing?.gender,
+        isFixedTable: isFixed,
+      }),
+    }
+  })
+  return {
+    ...table,
+    name: isFixed ? DEFAULT_FIXED_TABLE_NAME : table.name,
+    players,
+  }
+}
+
+/** 云端桌子名单还没回来时，已认领的默认牌桌也要先显示出来。 */
 export function listVisibleTables(): TableSummary[] {
-  const cached = listCachedTables()
+  const cached = listCachedTables().map(normalizeTableSummary)
   const identity = getTableIdentity()
   const tables = identity && !cached.some((table) => table.id === 'fixed-four')
-    ? [{
-      id: 'fixed-four', name: '常聚牌桌', seats: [...FIXED_MATCH_PLAYERS], mySeat: identity.playerName,
+    ? [normalizeTableSummary({
+      id: 'fixed-four', name: DEFAULT_FIXED_TABLE_NAME, seats: [...FIXED_MATCH_PLAYERS], mySeat: identity.playerName,
       role: identity.role, bindingId: identity.bindingId,
-      players: FIXED_MATCH_PLAYERS.map((name) => ({ name, claimed: name === identity.playerName })),
-    }, ...cached]
+      players: FIXED_MATCH_PLAYERS.map((name) => ({
+        name,
+        claimed: name === identity.playerName,
+        gender: FIXED_PLAYER_GENDERS[name],
+      })),
+    }), ...cached]
     : cached
   return [...tables].sort((a, b) => Number(b.id === 'fixed-four') - Number(a.id === 'fixed-four'))
 }
@@ -91,10 +131,21 @@ export async function listMyTables(): Promise<TableSummary[]> {
   return tables
 }
 
-export async function createTable(input: { name: string; seats: string[]; mySeat: string }): Promise<TableSummary> {
+export async function createTable(input: {
+  name: string
+  seats: string[]
+  mySeat: string
+  seatGenders?: Record<string, SeatGender>
+}): Promise<TableSummary> {
   const result = await call('createTable', input)
   const tables = listCachedTables().filter((table) => table.id !== result.table.id)
   store([...tables, result.table])
+  return result.table
+}
+
+export async function updateTableSeatGenders(tableId: string, seatGenders: Record<string, SeatGender>): Promise<TableSummary> {
+  const result = await call('updateSeatGenders', { tableId, seatGenders })
+  store(listCachedTables().map((table) => table.id === result.table.id ? result.table : table))
   return result.table
 }
 

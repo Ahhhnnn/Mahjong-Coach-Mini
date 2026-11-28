@@ -3,7 +3,8 @@ import { fetchCloudRecords, mergeRecords, syncRecordToCloud, type TrainRecord } 
 import { pushLocalFavoritesToCloud, syncCloudFavoritesToLocal } from './favorite-service'
 import { syncCloudMatchesToLocal } from './match-service'
 import { syncCloudSoloToLocal } from './solo-match-service'
-import { seedPersonalScores } from './table-directory-service'
+import { seedPersonalScores, TABLES_CHANGED } from './table-directory-service'
+import { type SeatGender } from './match-types'
 
 /**
  * 微信小程序登录与用户信息管理
@@ -108,11 +109,12 @@ export async function uploadAvatar(tempFilePath: string): Promise<string | null>
 }
 
 /**
- * 更新用户资料（头像 + 昵称）到云端
+ * 更新用户资料（头像 / 昵称 / 性别）到云端
  */
 export async function updateUserProfile(input: {
   avatarUrl?: string
   nickname?: string
+  gender?: SeatGender
 }): Promise<UserInfo | null> {
   try {
     const res = await Taro.cloud.callFunction({
@@ -124,10 +126,17 @@ export async function updateUserProfile(input: {
       console.warn('[auth] updateProfile failed:', result?.error)
       return null
     }
-    // 合并更新缓存
+    // 合并更新缓存，保留未提交的已有字段
     const cached = getCachedUser()
-    const merged = { ...cached, ...result.user } as UserInfo
+    const merged: UserInfo = {
+      openid: result.user.openid || cached?.openid || '',
+      nickname: result.user.nickname || cached?.nickname || '',
+      avatarUrl: result.user.avatarUrl || cached?.avatarUrl || '',
+      gender: result.user.gender || input.gender || cached?.gender,
+      identity: cached?.identity,
+    }
     cacheUser(merged)
+    if (input.gender) Taro.eventCenter?.trigger(TABLES_CHANGED)
     return merged
   } catch (e: any) {
     console.warn('[auth] update error:', e?.message)
